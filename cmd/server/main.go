@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -18,18 +19,18 @@ type storage interface {
 	add(new counter)
 }
 
-func (ms MemStorage) replace(new gauge) {
+func (ms *MemStorage) replace(new gauge) {
 	ms.gauge = new
 }
 
-func (ms MemStorage) add(new counter) {
+func (ms *MemStorage) add(new counter) {
 	ms.counter += new
 }
 
 var memStorage storage
 
 func main() {
-	memStorage = MemStorage{}
+	memStorage = &MemStorage{}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", undefinedMetric)
@@ -67,27 +68,31 @@ func receiveGaugeMetric(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if v, ok := interface{}(metricData[4]).(gauge); ok {
-		memStorage.replace(v)
+	if value, err := strconv.ParseFloat(metricData[4], 64); err == nil {
+		memStorage.replace(gauge(value))
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("hereOK\n"))
+		//w.Write([]byte("hereOK\n"))
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("hereBad\n"))
+		//w.Write([]byte("hereBad\n"))
 	}
 }
 
 func receiveCounterMetric(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	metricData := strings.Split(path, "/")
+	//w.Write([]byte(strings.Join(metricData, "-")))
+	//w.Write([]byte(strconv.Itoa(len(metricData))))
 	if len(metricData) != 5 {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if v, ok := interface{}(metricData[4]).(counter); ok {
-		memStorage.add(v)
+	if value, err := strconv.ParseInt(metricData[4], 10, 64); err == nil {
+		memStorage.add(counter(value))
 		w.WriteHeader(http.StatusOK)
+		//w.Write([]byte("hereOK\n"))
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
+		//w.Write([]byte("hereBad\n"))
 	}
 }
