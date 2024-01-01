@@ -21,6 +21,7 @@ func main() {
 	select {}
 }
 
+//123
 func updateMetrics() {
 	var stats runtime.MemStats
 	ms = MemStorage{}
