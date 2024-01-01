@@ -5,10 +5,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-const url = "http://localhost:8080/update/gauge/"
+const url = "http://localhost:8080/update/"
 
 func TestMiddleware(t *testing.T) {
 	type want struct {
@@ -22,7 +23,23 @@ func TestMiddleware(t *testing.T) {
 	}{
 		{
 			name:     "pass test #1",
-			endpoint: "HeapIdle/12345",
+			endpoint: "gauge/HeapIdle/12345",
+			want: want{
+				code:        200,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:     "pass test #2",
+			endpoint: "counter/testCounter/100",
+			want: want{
+				code:        200,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:     "pass test #3",
+			endpoint: "gauge/testGauge/100",
 			want: want{
 				code:        200,
 				contentType: "text/plain",
@@ -30,7 +47,7 @@ func TestMiddleware(t *testing.T) {
 		},
 		{
 			name:     "fail test #1: Not Found",
-			endpoint: "12345",
+			endpoint: "gauge/12345",
 			want: want{
 				code:        404,
 				contentType: "text/plain",
@@ -38,15 +55,31 @@ func TestMiddleware(t *testing.T) {
 		},
 		{
 			name:     "fail test #2: Not Found",
-			endpoint: "HeapIdleee/12345",
+			endpoint: "gauge/HeapIdleee/12345",
 			want: want{
 				code:        404,
 				contentType: "text/plain",
 			},
 		},
 		{
-			name:     "fail test #3: Bad Request",
-			endpoint: "HeapIdle/12qwerty345",
+			name:     "fail test #3: Not Found",
+			endpoint: "counter/",
+			want: want{
+				code:        404,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:     "fail test #4: Bad Request",
+			endpoint: "gauge/HeapIdle/12qwerty345",
+			want: want{
+				code:        400,
+				contentType: "text/plain",
+			},
+		},
+		{
+			name:     "fail test #5: Bad Request",
+			endpoint: "gauge/testGauge/none",
 			want: want{
 				code:        400,
 				contentType: "text/plain",
@@ -62,7 +95,12 @@ func TestMiddleware(t *testing.T) {
 			ms.Init()
 			msHandler := &MetricsHandler{MS: ms}
 
-			handler := Middleware(http.HandlerFunc(msHandler.ReceiveMetric))
+			var handler http.Handler
+			if strings.HasPrefix(test.endpoint, "gauge") {
+				handler = Middleware(http.HandlerFunc(msHandler.ReceiveGaugeMetric))
+			} else {
+				handler = Middleware(http.HandlerFunc(msHandler.ReceiveCounterMetric))
+			}
 			handler.ServeHTTP(w, request)
 			result := w.Result()
 
@@ -70,8 +108,4 @@ func TestMiddleware(t *testing.T) {
 			assert.Equal(t, test.want.contentType, result.Header.Get("Content-Type"))
 		})
 	}
-}
-
-func TestMetricsHandler_ReceiveMetric(t *testing.T) {
-
 }

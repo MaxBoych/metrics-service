@@ -5,26 +5,33 @@ type Counter int64
 
 type Repository interface {
 	Init()
-	Update(name string, new Gauge)
+	UpdateGauge(name string, new Gauge)
+	UpdateCounter(name string, new Counter)
 	count()
-	Contains(name string) bool
+	ContainsGauge(name string) bool
+	ContainsCounter(name string) bool
 }
 
 type MemStorage struct {
-	Gauges    map[string]Gauge
-	pollCount Counter
+	Gauges   map[string]Gauge
+	Counters map[string]Counter
 }
 
-func (ms *MemStorage) Update(name string, new Gauge) {
+func (ms *MemStorage) UpdateGauge(name string, new Gauge) {
 	ms.Gauges[name] = new
 	ms.count()
 }
 
-func (ms *MemStorage) count() {
-	ms.pollCount++
+func (ms *MemStorage) UpdateCounter(name string, new Counter) {
+	ms.Counters[name] = new
+	ms.count()
 }
 
-func (ms *MemStorage) Contains(name string) bool {
+func (ms *MemStorage) count() {
+	ms.Counters["PollCount"]++
+}
+
+func (ms *MemStorage) ContainsGauge(name string) bool {
 	if _, ok := ms.Gauges[name]; ok {
 		return true
 	} else {
@@ -32,8 +39,19 @@ func (ms *MemStorage) Contains(name string) bool {
 	}
 }
 
+func (ms *MemStorage) ContainsCounter(name string) bool {
+	if _, ok := ms.Counters[name]; ok {
+		return true
+	} else {
+		return false
+	}
+}
+
 func (ms *MemStorage) Init() {
-	ms.pollCount = 0
+	ms.Counters = map[string]Counter{
+		"PollCount":   Counter(0),
+		"testCounter": Counter(0),
+	}
 
 	ms.Gauges = map[string]Gauge{
 
@@ -130,5 +148,8 @@ func (ms *MemStorage) Init() {
 
 		//Кастомное рандомное значение
 		"RandomValue": Gauge(0),
+
+		//Значение для тестов
+		"testGauge": Gauge(0),
 	}
 }
