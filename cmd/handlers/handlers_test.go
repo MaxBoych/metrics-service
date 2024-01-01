@@ -103,6 +103,7 @@ func TestMiddleware(t *testing.T) {
 			}
 			handler.ServeHTTP(w, request)
 			result := w.Result()
+			defer result.Body.Close()
 
 			assert.Equal(t, test.want.code, result.StatusCode)
 			assert.Equal(t, test.want.contentType, result.Header.Get("Content-Type"))
