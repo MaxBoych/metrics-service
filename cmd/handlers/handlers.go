@@ -16,9 +16,13 @@ type MetricsHandler struct {
 	MS storage.Repository
 }
 
+func NotFound(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+}
+
 func (handler *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	
+
 	metrics := handler.MS.GetAllMetrics()
 	var result []byte
 	for _, metric := range metrics {

@@ -24,6 +24,8 @@ func main() {
 	router.Post("/update/gauge/{name}/{value}", msHandler.UpdateGaugeMetric)
 	router.Post("/update/counter/{name}/{value}", msHandler.UpdateCounterMetric)
 
+	router.NotFound(handlers.NotFound)
+
 	//mux := http.NewServeMux()
 	//mux.HandleFunc("/", handlers.UndefinedMetric)
 	//mux.Handle("/update/gauge/", handlers.Middleware(http.HandlerFunc(msHandler.UpdateGaugeMetric)))
