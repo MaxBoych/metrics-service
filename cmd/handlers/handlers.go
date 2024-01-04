@@ -3,70 +3,115 @@ package handlers
 import (
 	//"fmt"
 	"github.com/MaxBoych/MetricsService/cmd/storage"
+	"github.com/go-chi/chi/v5"
+	//"log"
+
+	//"log"
 	"net/http"
 	"strconv"
-	"strings"
+	//"strings"
 )
 
 type MetricsHandler struct {
 	MS storage.Repository
 }
 
-func UndefinedMetric(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusBadRequest)
+func (handler *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	
+	metrics := handler.MS.GetAllMetrics()
+	var result []byte
+	for _, metric := range metrics {
+		result = append(result, []byte(metric)...)
+		result = append(result, '\n')
+	}
+	_, err := w.Write(result)
+	if err != nil {
+		panic(err)
+	}
 }
 
-func Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
+//func Middleware(next http.Handler) http.Handler {
+//	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//		if r.Method != http.MethodPost {
+//			w.WriteHeader(http.StatusMethodNotAllowed)
+//			return
+//		}
+//
+//		w.Header().Set("Content-Type", "text/plain")
+//		next.ServeHTTP(w, r)
+//	})
+//}
 
-		w.Header().Set("Content-Type", "text/plain")
-		next.ServeHTTP(w, r)
-	})
-}
+func (handler *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
 
-func (handler *MetricsHandler) ReceiveGaugeMetric(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	//w.Header().Set("Content-Type", )
-	metricData := strings.Split(path, "/")
-	//w.Write([]byte(strings.Join(metricData, "-")))
-	//w.Write([]byte(strconv.Itoa(len(metricData))))
-	if len(metricData) != 5 || !handler.MS.ContainsGauge(metricData[3]) {
+	name := chi.URLParam(r, "name")
+	var value string
+	var ok bool
+	if value, ok = handler.MS.GetGauge(name); !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	if value, err := strconv.ParseFloat(metricData[4], 64); err == nil {
-		handler.MS.UpdateGauge(metricData[3], storage.Gauge(value))
-		w.WriteHeader(http.StatusOK)
-		//w.Write([]byte(fmt.Sprintf("Обновлена метрика %s = %f\n", metricData[3], value)))
-		//fmt.Println(fmt.Sprintf("Обновлена метрика %s = %f\n", metricData[3], value))
-	} else {
-		w.WriteHeader(http.StatusBadRequest)
-		//w.Write([]byte("hereBad\n"))
+	_, err := w.Write([]byte(value))
+	if err != nil {
+		panic(err)
 	}
 }
 
-func (handler *MetricsHandler) ReceiveCounterMetric(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	metricData := strings.Split(path, "/")
-	//w.Write([]byte(strings.Join(metricData, "-")))
-	//w.Write([]byte(strconv.Itoa(len(metricData))))
-	if len(metricData) != 5 || !handler.MS.ContainsCounter(metricData[3]) {
+func (handler *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+
+	name := chi.URLParam(r, "name")
+	var value string
+	var ok bool
+	if value, ok = handler.MS.GetCounter(name); !ok {
 		w.WriteHeader(http.StatusNotFound)
-		//fmt.Println("StatusNotFound")
 		return
 	}
 
-	if value, err := strconv.ParseInt(metricData[4], 10, 64); err == nil {
-		handler.MS.UpdateCounter(metricData[3], storage.Counter(value))
+	_, err := w.Write([]byte(value))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (handler *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+
+	//log.Printf("Request URL: %s", r.URL.String())
+	name := chi.URLParam(r, "name")
+	value := chi.URLParam(r, "value")
+	//log.Printf("UpdateGaugeMetric called with name: %s and value: %s", name, value)
+	if _, ok := handler.MS.GetGauge(name); !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	//value := chi.URLParam(r, "value")
+	if value, err := strconv.ParseFloat(value, 64); err == nil {
+		handler.MS.UpdateGauge(name, storage.Gauge(value))
 		w.WriteHeader(http.StatusOK)
-		//fmt.Println("StatusOK")
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		//fmt.Println("StatusBadRequest")
+	}
+}
+
+func (handler *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+
+	name := chi.URLParam(r, "name")
+	if _, ok := handler.MS.GetCounter(name); !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	value := chi.URLParam(r, "value")
+	if value, err := strconv.ParseInt(value, 10, 64); err == nil {
+		handler.MS.UpdateCounter(name, storage.Counter(value))
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
 	}
 }

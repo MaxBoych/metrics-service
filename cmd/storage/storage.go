@@ -1,5 +1,7 @@
 package storage
 
+import "fmt"
+
 type Gauge float64
 type Counter int64
 
@@ -8,13 +10,43 @@ type Repository interface {
 	UpdateGauge(name string, new Gauge)
 	UpdateCounter(name string, new Counter)
 	count()
-	ContainsGauge(name string) bool
-	ContainsCounter(name string) bool
+	//ContainsGauge(name string) bool
+	//ContainsCounter(name string) bool
+	GetGauge(name string) (string, bool)
+	GetCounter(name string) (string, bool)
+	GetAllMetrics() []string
 }
 
 type MemStorage struct {
 	Gauges   map[string]Gauge
 	Counters map[string]Counter
+}
+
+func (ms *MemStorage) GetAllMetrics() (metrics []string) {
+	//var metrics []string
+	for k, v := range ms.Gauges {
+		metrics = append(metrics, fmt.Sprintf("%s: %v", k, v))
+	}
+	for k, v := range ms.Counters {
+		metrics = append(metrics, fmt.Sprintf("%s: %v", k, v))
+	}
+	return
+}
+
+func (ms *MemStorage) GetGauge(name string) (string, bool) {
+	if value, ok := ms.Gauges[name]; ok {
+		value := fmt.Sprintf("%v", value)
+		return value, true
+	}
+	return "", false
+}
+
+func (ms *MemStorage) GetCounter(name string) (string, bool) {
+	if value, ok := ms.Counters[name]; ok {
+		value := fmt.Sprintf("%v", value)
+		return value, true
+	}
+	return "", false
 }
 
 func (ms *MemStorage) UpdateGauge(name string, new Gauge) {
@@ -31,21 +63,21 @@ func (ms *MemStorage) count() {
 	ms.Counters["PollCount"]++
 }
 
-func (ms *MemStorage) ContainsGauge(name string) bool {
-	if _, ok := ms.Gauges[name]; ok {
-		return true
-	} else {
-		return false
-	}
-}
-
-func (ms *MemStorage) ContainsCounter(name string) bool {
-	if _, ok := ms.Counters[name]; ok {
-		return true
-	} else {
-		return false
-	}
-}
+//func (ms *MemStorage) ContainsGauge(name string) bool {
+//	if _, ok := ms.Gauges[name]; ok {
+//		return true
+//	} else {
+//		return false
+//	}
+//}
+//
+//func (ms *MemStorage) ContainsCounter(name string) bool {
+//	if _, ok := ms.Counters[name]; ok {
+//		return true
+//	} else {
+//		return false
+//	}
+//}
 
 func (ms *MemStorage) Init() {
 	ms.Counters = map[string]Counter{
