@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/MaxBoych/MetricsService/cmd/handlers"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	//"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 
 	"github.com/MaxBoych/MetricsService/cmd/storage"
@@ -15,7 +15,7 @@ func main() {
 	msHandler := &handlers.MetricsHandler{MS: ms}
 
 	router := chi.NewRouter()
-	router.Use(middleware.AllowContentType("text/plain"))
+	//router.Use(middleware.AllowContentType("text/plain"))
 
 	router.Get("/", msHandler.GetAllMetrics)
 	router.Get("/value/gauge/{name}", msHandler.GetGaugeMetric)
