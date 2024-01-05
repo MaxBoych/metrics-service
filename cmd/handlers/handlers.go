@@ -1,15 +1,10 @@
 package handlers
 
 import (
-	//"fmt"
 	"github.com/MaxBoych/MetricsService/cmd/storage"
 	"github.com/go-chi/chi/v5"
-	//"log"
-
-	//"log"
 	"net/http"
 	"strconv"
-	//"strings"
 )
 
 type MetricsHandler struct {
