@@ -14,17 +14,26 @@ func main() {
 	ms.Init()
 	msHandler := &handlers.MetricsHandler{MS: ms}
 
-	router := chi.NewRouter()
 	//router.Use(middleware.AllowContentType("text/plain"))
 
+	router := chi.NewRouter()
+
 	router.Get("/", msHandler.GetAllMetrics)
-	router.Get("/value/gauge/{name}", msHandler.GetGaugeMetric)
-	router.Get("/value/counter/{name}", msHandler.GetCounterMetric)
+	router.Route("/value", func(r chi.Router) {
+		r.Get("/gauge/{name}", msHandler.GetGaugeMetric)
+		r.Get("/counter/{name}", msHandler.GetCounterMetric)
+	})
 
-	router.Post("/update/gauge/{name}/{value}", msHandler.UpdateGaugeMetric)
-	router.Post("/update/counter/{name}/{value}", msHandler.UpdateCounterMetric)
+	router.Route("/update", func(r chi.Router) {
+		r.Post("/gauge/{name}/{value}", msHandler.UpdateGaugeMetric)
+		r.Post("/counter/{name}/{value}", msHandler.UpdateCounterMetric)
+	})
 
-	router.NotFound(handlers.NotFound)
+	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		handlers.BadRequest(w, r)
+	})
+
+	//router.NotFound(handlers.NotFound)
 
 	//mux := http.NewServeMux()
 	//mux.HandleFunc("/", handlers.UndefinedMetric)
