@@ -66,7 +66,7 @@ func TestMetricsHandler_UpdateGaugeMetric(t *testing.T) {
 		{
 			name:     "UPDATE GAUGE fail test #2: Not Found",
 			method:   http.MethodPost,
-			endpoint: "/update/gauge/HeapIdleee/12345",
+			endpoint: "/update/gauge/",
 			want: want{
 				code:        404,
 				contentType: "text/plain",
@@ -140,7 +140,7 @@ func TestMetricsHandler_UpdateCounterMetric(t *testing.T) {
 		{
 			name:     "UPDATE COUNTER fail test #1: Not Found",
 			method:   http.MethodPost,
-			endpoint: "/update/counter/testttCounter/100",
+			endpoint: "/update/counter/",
 			want: want{
 				code:        404,
 				contentType: "text/plain",
