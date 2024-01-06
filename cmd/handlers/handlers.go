@@ -94,10 +94,10 @@ func (handler *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.
 	name := chi.URLParam(r, "name")
 	value := chi.URLParam(r, "value")
 	//log.Printf("UpdateGaugeMetric called with name: %s and value: %s", name, value)
-	if _, ok := handler.MS.GetGauge(name); !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
+	//if _, ok := handler.MS.GetGauge(name); !ok {
+	//	w.WriteHeader(http.StatusNotFound)
+	//	return
+	//}
 
 	//value := chi.URLParam(r, "value")
 	if value, err := strconv.ParseFloat(value, 64); err == nil {
@@ -112,10 +112,10 @@ func (handler *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *htt
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
-	if _, ok := handler.MS.GetCounter(name); !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
+	//if _, ok := handler.MS.GetCounter(name); !ok {
+	//	w.WriteHeader(http.StatusNotFound)
+	//	return
+	//}
 
 	value := chi.URLParam(r, "value")
 	if value, err := strconv.ParseInt(value, 10, 64); err == nil {

@@ -81,8 +81,8 @@ func (ms *MemStorage) count() {
 
 func (ms *MemStorage) Init() {
 	ms.Counters = map[string]Counter{
-		"PollCount":   Counter(0),
-		"testCounter": Counter(0),
+		"PollCount": Counter(0),
+		//"testCounter": Counter(0),
 	}
 
 	ms.Gauges = map[string]Gauge{
@@ -179,9 +179,9 @@ func (ms *MemStorage) Init() {
 		"Lookups": Gauge(0),
 
 		//Кастомное рандомное значение
-		"RandomValue": Gauge(0),
+		//"RandomValue": Gauge(0),
 
 		//Значение для тестов
-		"testGauge": Gauge(0),
+		//"testGauge": Gauge(0),
 	}
 }
