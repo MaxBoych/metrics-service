@@ -46,6 +46,13 @@ func (handler *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Requ
 //	})
 //}
 
+//func (handler *MetricsHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
+//	w.Header().Set("Content-Type", "text/plain")
+//
+//	metricType := chi.URLParam(r, "type")
+//	if
+//}
+
 func (handler *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 

@@ -20,13 +20,26 @@ func main() {
 
 	router.Get("/", msHandler.GetAllMetrics)
 	router.Route("/value", func(r chi.Router) {
+
 		r.Get("/gauge/{name}", msHandler.GetGaugeMetric)
 		r.Get("/counter/{name}", msHandler.GetCounterMetric)
+
+		r.NotFound(handlers.BadRequest)
 	})
 
 	router.Route("/update", func(r chi.Router) {
-		r.Post("/gauge/{name}/{value}", msHandler.UpdateGaugeMetric)
-		r.Post("/counter/{name}/{value}", msHandler.UpdateCounterMetric)
+
+		r.Route("/gauge", func(r chi.Router) {
+			r.Post("/{name}/{value}", msHandler.UpdateGaugeMetric)
+			r.NotFound(handlers.NotFound)
+		})
+
+		r.Route("/counter", func(r chi.Router) {
+			r.Post("/{name}/{value}", msHandler.UpdateCounterMetric)
+			r.NotFound(handlers.NotFound)
+		})
+
+		r.NotFound(handlers.BadRequest)
 	})
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
