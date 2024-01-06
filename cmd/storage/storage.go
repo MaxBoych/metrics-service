@@ -55,7 +55,7 @@ func (ms *MemStorage) UpdateGauge(name string, new Gauge) {
 }
 
 func (ms *MemStorage) UpdateCounter(name string, new Counter) {
-	ms.Counters[name] = new
+	ms.Counters[name] += new
 	ms.count()
 }
 
