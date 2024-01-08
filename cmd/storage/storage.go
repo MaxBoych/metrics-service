@@ -10,8 +10,6 @@ type Repository interface {
 	UpdateGauge(name string, new Gauge)
 	UpdateCounter(name string, new Counter)
 	count()
-	//ContainsGauge(name string) bool
-	//ContainsCounter(name string) bool
 	GetGauge(name string) (string, bool)
 	GetCounter(name string) (string, bool)
 	GetAllMetrics() []string

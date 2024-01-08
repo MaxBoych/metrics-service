@@ -9,12 +9,14 @@ import (
 	"time"
 )
 
-const pollInterval = 2
-const reportInterval = 10
+//const pollInterval = 2
+//const reportInterval = 10
 
 var ms storage.MemStorage
 
 func main() {
+	parseFlags()
+
 	go updateMetrics()
 	go sendMetrics()
 
@@ -26,7 +28,7 @@ func updateMetrics() {
 	ms = storage.MemStorage{}
 	ms.Gauges = map[string]storage.Gauge{}
 	for {
-		time.Sleep(pollInterval * time.Second)
+		time.Sleep(time.Duration(flagPollInterval) * time.Second)
 
 		runtime.ReadMemStats(&stats)
 
@@ -63,10 +65,10 @@ func updateMetrics() {
 
 func sendMetrics() {
 	for {
-		time.Sleep(reportInterval * time.Second)
+		time.Sleep(time.Duration(flagReportInterval) * time.Second)
 
 		for key, value := range ms.Gauges {
-			url := fmt.Sprintf("http://localhost:8080/update/gauge/%s/%s", key, fmt.Sprint(value))
+			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", flagRunAddr, key, fmt.Sprint(value))
 			response, err := http.Post(url, "text/plain", nil)
 			if err != nil {
 				panic(err)

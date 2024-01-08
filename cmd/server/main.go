@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/MaxBoych/MetricsService/cmd/handlers"
 	"github.com/go-chi/chi/v5"
-	//"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 
 	"github.com/MaxBoych/MetricsService/cmd/storage"
@@ -53,8 +52,10 @@ func main() {
 	//mux.Handle("/update/gauge/", handlers.Middleware(http.HandlerFunc(msHandler.UpdateGaugeMetric)))
 	//mux.Handle("/update/counter/", handlers.Middleware(http.HandlerFunc(msHandler.UpdateCounterMetric)))
 
-	err := http.ListenAndServe(":8080", router)
+	parseFlags()
+	err := http.ListenAndServe(flagRunAddr, router)
 	if err != nil {
 		panic(err)
 	}
+	//fmt.Println("Running server on", flagRunAddr)
 }
