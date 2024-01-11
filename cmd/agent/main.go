@@ -2,36 +2,44 @@ package main
 
 import (
 	"fmt"
-	"github.com/MaxBoych/MetricsService/cmd/storage"
+	"github.com/MaxBoych/MetricsService/internal/storage"
+	"log"
 	"math/rand"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 )
 
-//const pollInterval = 2
-//const reportInterval = 10
-
-var ms storage.MemStorage
-
 func main() {
-	parseFlags()
+	config := parseConfig()
 
-	go updateMetrics()
-	go sendMetrics()
+	var ms *storage.MemStorage
+	var wg sync.WaitGroup
 
-	select {}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		updateMetrics(ms, config)
+	}()
+	go func() {
+		defer wg.Done()
+		sendMetrics(ms, config)
+	}()
+
+	wg.Wait()
 }
 
-func updateMetrics() {
+func updateMetrics(ms *storage.MemStorage, config Config) {
 	var stats runtime.MemStats
-	ms = storage.MemStorage{}
-	ms.Gauges = map[string]storage.Gauge{}
+	ms = storage.NewMemStorage()
+
 	for {
-		time.Sleep(time.Duration(flagPollInterval) * time.Second)
+		time.Sleep(time.Duration(config.flagPollInterval) * time.Second)
 
 		runtime.ReadMemStats(&stats)
 
+		ms.Mu.Lock()
 		ms.Gauges["Alloc"] = storage.Gauge(stats.Alloc)
 		ms.Gauges["BuckHashSys"] = storage.Gauge(stats.BuckHashSys)
 		ms.Gauges["Frees"] = storage.Gauge(stats.Frees)
@@ -60,22 +68,33 @@ func updateMetrics() {
 		ms.Gauges["StackSys"] = storage.Gauge(stats.StackSys)
 		ms.Gauges["Lookups"] = storage.Gauge(stats.Lookups)
 		ms.Gauges["RandomValue"] = storage.Gauge(rand.Float64())
+		ms.Mu.Unlock()
 	}
 }
 
-func sendMetrics() {
+func sendMetrics(ms *storage.MemStorage, config Config) {
 	for {
-		time.Sleep(time.Duration(flagReportInterval) * time.Second)
+		time.Sleep(time.Duration(config.flagReportInterval) * time.Second)
 
-		for key, value := range ms.Gauges {
-			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", flagRunAddr, key, fmt.Sprint(value))
+		var gaugesCopy map[string]storage.Gauge
+
+		ms.Mu.Lock()
+		gaugesCopy = make(map[string]storage.Gauge, len(ms.Gauges))
+		for k, v := range ms.Gauges {
+			gaugesCopy[k] = v
+		}
+		ms.Mu.Unlock()
+
+		for key, value := range gaugesCopy {
+			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.flagRunAddr, key, fmt.Sprint(value))
 			response, err := http.Post(url, "text/plain", nil)
 			if err != nil {
-				panic(err)
+				log.Printf("Error sending POST request: %v\n", err)
+				continue
 			}
 			err = response.Body.Close()
 			if err != nil {
-				panic(err)
+				log.Printf("Error closing response body: %v\n", err)
 			}
 		}
 	}

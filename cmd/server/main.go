@@ -1,19 +1,15 @@
 package main
 
 import (
-	"github.com/MaxBoych/MetricsService/cmd/handlers"
+	"github.com/MaxBoych/MetricsService/internal/handlers"
+	"github.com/MaxBoych/MetricsService/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"net/http"
-
-	"github.com/MaxBoych/MetricsService/cmd/storage"
 )
 
 func main() {
-	ms := &storage.MemStorage{}
-	ms.Init()
-	msHandler := &handlers.MetricsHandler{MS: ms}
-
-	//router.Use(middleware.AllowContentType("text/plain"))
+	ms := storage.NewMemStorage()
+	msHandler := handlers.NewMetricsHandler(ms)
 
 	router := chi.NewRouter()
 
@@ -45,17 +41,9 @@ func main() {
 		handlers.BadRequest(w, r)
 	})
 
-	//router.NotFound(handlers.NotFound)
-
-	//mux := http.NewServeMux()
-	//mux.HandleFunc("/", handlers.UndefinedMetric)
-	//mux.Handle("/update/gauge/", handlers.Middleware(http.HandlerFunc(msHandler.UpdateGaugeMetric)))
-	//mux.Handle("/update/counter/", handlers.Middleware(http.HandlerFunc(msHandler.UpdateCounterMetric)))
-
-	parseFlags()
-	err := http.ListenAndServe(flagRunAddr, router)
+	config := parseConfig()
+	err := http.ListenAndServe(config.flagRunAddr, router)
 	if err != nil {
 		panic(err)
 	}
-	//fmt.Println("Running server on", flagRunAddr)
 }

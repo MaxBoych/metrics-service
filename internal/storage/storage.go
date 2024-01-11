@@ -1,27 +1,28 @@
 package storage
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type Gauge float64
 type Counter int64
 
-type Repository interface {
-	Init()
-	UpdateGauge(name string, new Gauge)
-	UpdateCounter(name string, new Counter)
-	count()
-	GetGauge(name string) (string, bool)
-	GetCounter(name string) (string, bool)
-	GetAllMetrics() []string
-}
-
 type MemStorage struct {
 	Gauges   map[string]Gauge
 	Counters map[string]Counter
+	Mu       sync.Mutex
+}
+
+func NewMemStorage() (storage *MemStorage) {
+	storage = &MemStorage{}
+	// Оставил функцию init, так как в ней содержится информация о метриках, что занимает слишком много места.
+	// Пусть лучше это будет отдельной вспомогательной функцией.
+	storage.Init()
+	return
 }
 
 func (ms *MemStorage) GetAllMetrics() (metrics []string) {
-	//var metrics []string
 	for k, v := range ms.Gauges {
 		metrics = append(metrics, fmt.Sprintf("%s: %v", k, v))
 	}
@@ -49,38 +50,21 @@ func (ms *MemStorage) GetCounter(name string) (string, bool) {
 
 func (ms *MemStorage) UpdateGauge(name string, new Gauge) {
 	ms.Gauges[name] = new
-	ms.count()
+	ms.Count()
 }
 
 func (ms *MemStorage) UpdateCounter(name string, new Counter) {
 	ms.Counters[name] += new
-	ms.count()
+	ms.Count()
 }
 
-func (ms *MemStorage) count() {
+func (ms *MemStorage) Count() {
 	ms.Counters["PollCount"]++
 }
-
-//func (ms *MemStorage) ContainsGauge(name string) bool {
-//	if _, ok := ms.Gauges[name]; ok {
-//		return true
-//	} else {
-//		return false
-//	}
-//}
-//
-//func (ms *MemStorage) ContainsCounter(name string) bool {
-//	if _, ok := ms.Counters[name]; ok {
-//		return true
-//	} else {
-//		return false
-//	}
-//}
 
 func (ms *MemStorage) Init() {
 	ms.Counters = map[string]Counter{
 		"PollCount": Counter(0),
-		//"testCounter": Counter(0),
 	}
 
 	ms.Gauges = map[string]Gauge{
@@ -175,11 +159,5 @@ func (ms *MemStorage) Init() {
 
 		//Количество поисковых запросов к хеш-таблице, которые не сопровождались выделением памяти.
 		"Lookups": Gauge(0),
-
-		//Кастомное рандомное значение
-		//"RandomValue": Gauge(0),
-
-		//Значение для тестов
-		//"testGauge": Gauge(0),
 	}
 }
