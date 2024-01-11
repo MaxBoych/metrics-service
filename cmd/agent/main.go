@@ -14,9 +14,9 @@ import (
 func main() {
 	config := parseConfig()
 
-	var ms *storage.MemStorage
+	ms := storage.NewMemStorage()
+	
 	var wg sync.WaitGroup
-
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
@@ -32,7 +32,6 @@ func main() {
 
 func updateMetrics(ms *storage.MemStorage, config Config) {
 	var stats runtime.MemStats
-	ms = storage.NewMemStorage()
 
 	for {
 		time.Sleep(time.Duration(config.flagPollInterval) * time.Second)
