@@ -2,26 +2,38 @@ package main
 
 import (
 	"flag"
-	"github.com/caarlos0/env/v6"
-	"log"
+	//"github.com/caarlos0/env/v10"
+	"os"
+	"strconv"
 )
 
 type Config struct {
-	flagRunAddr        string `env:"ADDRESS"`
-	flagReportInterval int    `env:"REPORT_INTERVAL"`
-	flagPollInterval   int    `env:"POLL_INTERVAL"`
+	runAddr        string `env:"ADDRESS"`
+	reportInterval int    `env:"REPORT_INTERVAL"`
+	pollInterval   int    `env:"POLL_INTERVAL"`
 }
 
 func parseConfig() (config Config) {
-	flag.StringVar(&config.flagRunAddr, "a", ":8080", "address and port to run server")
-	flag.IntVar(&config.flagReportInterval, "r", 10, "frequency of sending metrics on the server")
-	flag.IntVar(&config.flagPollInterval, "p", 2, "frequency of polling metrics from the 'runtime' package")
+	flag.StringVar(&config.runAddr, "a", ":8080", "address and port to run server")
+	flag.IntVar(&config.reportInterval, "r", 10, "frequency of sending metrics on the server")
+	flag.IntVar(&config.pollInterval, "p", 2, "frequency of polling metrics from the 'runtime' package")
 	flag.Parse()
 
-	err := env.Parse(&config)
-	if err != nil {
-		log.Fatalf("error parsing env vars: %v\n", err)
+	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
+		config.runAddr = envRunAddr
 	}
+	if envReportInterval, err := strconv.Atoi(os.Getenv("REPORT_INTERVAL")); err == nil {
+		config.reportInterval = envReportInterval
+	}
+	if envPollInterval, err := strconv.Atoi(os.Getenv("POLL_INTERVAL")); err == nil {
+		config.pollInterval = envPollInterval
+	}
+
+	// библиотека "github.com/caarlos0/env/v10" с методом env.Parse() не работает (переменные окружения не считываются)
+	//err := env.Parse(&config)
+	//if err != nil {
+	//	log.Fatalf("error parsing env vars: %v\n", err)
+	//}
 
 	return
 }

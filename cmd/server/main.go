@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/handlers"
 	"github.com/MaxBoych/MetricsService/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -42,8 +43,10 @@ func main() {
 	})
 
 	config := parseConfig()
+	fmt.Printf("server running on %s\n", config.flagRunAddr)
 	err := http.ListenAndServe(config.flagRunAddr, router)
 	if err != nil {
 		panic(err)
 	}
+	fmt.Printf("server running on %s\n", config.flagRunAddr)
 }

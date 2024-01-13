@@ -12,10 +12,9 @@ import (
 )
 
 func main() {
+	ms := storage.NewMemStorage()
 	config := parseConfig()
 
-	ms := storage.NewMemStorage()
-	
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -34,7 +33,7 @@ func updateMetrics(ms *storage.MemStorage, config Config) {
 	var stats runtime.MemStats
 
 	for {
-		time.Sleep(time.Duration(config.flagPollInterval) * time.Second)
+		time.Sleep(time.Duration(config.pollInterval) * time.Second)
 
 		runtime.ReadMemStats(&stats)
 
@@ -73,7 +72,7 @@ func updateMetrics(ms *storage.MemStorage, config Config) {
 
 func sendMetrics(ms *storage.MemStorage, config Config) {
 	for {
-		time.Sleep(time.Duration(config.flagReportInterval) * time.Second)
+		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
 		var gaugesCopy map[string]storage.Gauge
 
@@ -85,7 +84,7 @@ func sendMetrics(ms *storage.MemStorage, config Config) {
 		ms.Mu.Unlock()
 
 		for key, value := range gaugesCopy {
-			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.flagRunAddr, key, fmt.Sprint(value))
+			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.runAddr, key, fmt.Sprint(value))
 			response, err := http.Post(url, "text/plain", nil)
 			if err != nil {
 				log.Printf("Error sending POST request: %v\n", err)

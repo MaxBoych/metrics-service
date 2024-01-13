@@ -63,17 +63,17 @@ jobs:
           go build -buildvcs=false -o server
           
       # custom debug
-      - name: Start server
-        run: |
-          ./cmd/server/server &
-          SERVER_PID=$!
-          echo "Server started with PID $SERVER_PID"
-
-      - name: Debug host
-        run: |
-          echo "Проверяем localhost:8080"
-          curl localhost:8080
-          kill $SERVER_PID
+#      - name: Start server
+#        run: |
+#          ./cmd/server/server &
+#          SERVER_PID=$!
+#          echo "Server started with PID $SERVER_PID"
+#
+#      - name: Debug host
+#        run: |
+#          echo "Проверяем localhost:8080"
+#          curl localhost:8080
+#          kill $SERVER_PID
       #
 
       - name: "Code increment #1"
