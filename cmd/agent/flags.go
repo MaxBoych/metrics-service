@@ -12,3 +12,5 @@ func parseFlags() {
 	flag.IntVar(&flagPollInterval, "p", 2, "frequency of polling metrics from the 'runtime' package")
 	flag.Parse()
 }
+
+//
