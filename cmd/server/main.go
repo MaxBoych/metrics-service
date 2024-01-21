@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/handlers"
+	"github.com/MaxBoych/MetricsService/internal/logger"
 	"github.com/MaxBoych/MetricsService/internal/storage"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 	"net/http"
 )
 
@@ -12,7 +14,12 @@ func main() {
 	ms := storage.NewMemStorage()
 	msHandler := handlers.NewMetricsHandler(ms)
 
+	if err := logger.Initialize("INFO"); err != nil {
+		fmt.Printf("logger init error: %v\n", err)
+	}
+
 	router := chi.NewRouter()
+	router.Use(logger.MiddlewareLogger)
 
 	router.Get("/", msHandler.GetAllMetrics)
 	router.Route("/value", func(r chi.Router) {
@@ -43,10 +50,8 @@ func main() {
 	})
 
 	config := parseConfig()
-	fmt.Printf("server running on %s\n", config.flagRunAddr)
-	err := http.ListenAndServe(config.flagRunAddr, router)
-	if err != nil {
+	logger.Log.Info("running server", zap.String("address", config.flagRunAddr))
+	if err := http.ListenAndServe(config.flagRunAddr, router); err != nil {
 		panic(err)
 	}
-	fmt.Printf("server running on %s\n", config.flagRunAddr)
 }
