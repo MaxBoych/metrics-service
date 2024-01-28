@@ -24,6 +24,7 @@ func main() {
 	router.Get("/", msHandler.GetAllMetrics)
 	router.Route("/value", func(r chi.Router) {
 
+		r.Get("/", msHandler.GetMetricJSON)
 		r.Get("/gauge/{name}", msHandler.GetGaugeMetric)
 		r.Get("/counter/{name}", msHandler.GetCounterMetric)
 
@@ -32,6 +33,7 @@ func main() {
 
 	router.Route("/update", func(r chi.Router) {
 
+		r.Post("/", msHandler.UpdateMetricJSON)
 		r.Route("/gauge", func(r chi.Router) {
 			r.Post("/{name}/{value}", msHandler.UpdateGaugeMetric)
 			r.NotFound(handlers.NotFound)
