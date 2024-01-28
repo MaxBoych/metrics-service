@@ -48,14 +48,18 @@ func (ms *MemStorage) GetCounter(name string) (string, bool) {
 	return "", false
 }
 
-func (ms *MemStorage) UpdateGauge(name string, new Gauge) {
+func (ms *MemStorage) UpdateGauge(name string, new Gauge) Gauge {
 	ms.Gauges[name] = new
 	ms.Count()
+
+	return ms.Gauges[name]
 }
 
-func (ms *MemStorage) UpdateCounter(name string, new Counter) {
+func (ms *MemStorage) UpdateCounter(name string, new Counter) Counter {
 	ms.Counters[name] += new
 	ms.Count()
+
+	return ms.Counters[name]
 }
 
 func (ms *MemStorage) Count() {

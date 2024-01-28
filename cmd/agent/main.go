@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/MaxBoych/MetricsService/internal/models"
 	"github.com/MaxBoych/MetricsService/internal/storage"
 	"log"
 	"math/rand"
@@ -24,6 +27,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		sendMetrics(ms, config)
+		sendMetricsJSON(ms, config)
 	}()
 
 	wg.Wait()
@@ -86,6 +90,46 @@ func sendMetrics(ms *storage.MemStorage, config Config) {
 		for key, value := range gaugesCopy {
 			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.runAddr, key, fmt.Sprint(value))
 			response, err := http.Post(url, "text/plain", nil)
+			if err != nil {
+				log.Printf("Error sending POST request: %v\n", err)
+				continue
+			}
+			err = response.Body.Close()
+			if err != nil {
+				log.Printf("Error closing response body: %v\n", err)
+			}
+		}
+	}
+}
+
+func sendMetricsJSON(ms *storage.MemStorage, config Config) {
+	for {
+		time.Sleep(time.Duration(config.reportInterval) * time.Second)
+
+		var gaugesCopy map[string]storage.Gauge
+
+		ms.Mu.Lock()
+		gaugesCopy = make(map[string]storage.Gauge, len(ms.Gauges))
+		for k, v := range ms.Gauges {
+			gaugesCopy[k] = v
+		}
+		ms.Mu.Unlock()
+
+		for key, value := range gaugesCopy {
+
+			g := float64(value)
+			metrics := models.Metrics{
+				ID:    key,
+				MType: "gauge",
+				Value: &g,
+			}
+			jsonBody, err := json.Marshal(metrics)
+			if err != nil {
+				panic(err)
+			}
+
+			url := fmt.Sprintf("http://%s/update/", config.runAddr)
+			response, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
 			if err != nil {
 				log.Printf("Error sending POST request: %v\n", err)
 				continue
