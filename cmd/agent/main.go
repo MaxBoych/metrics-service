@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/models"
@@ -128,8 +129,26 @@ func sendMetricsJSON(ms *storage.MemStorage, config Config) {
 				panic(err)
 			}
 
+			var b bytes.Buffer
+			gz := gzip.NewWriter(&b)
+			_, err = gz.Write(jsonBody)
+			if err != nil {
+				log.Printf("Error compressing JSON: %v\n", err)
+				continue
+			}
+			gz.Close()
+
 			url := fmt.Sprintf("http://%s/update/", config.runAddr)
-			response, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+			request, err := http.NewRequest("POST", url, &b)
+			if err != nil {
+				log.Printf("Error creating request: %v\n", err)
+				continue
+			}
+
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Content-Encoding", "gzip")
+
+			response, err := http.DefaultClient.Do(request)
 			if err != nil {
 				log.Printf("Error sending POST request: %v\n", err)
 				continue

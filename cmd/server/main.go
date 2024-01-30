@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/MaxBoych/MetricsService/internal/gzip"
 	"github.com/MaxBoych/MetricsService/internal/handlers"
 	"github.com/MaxBoych/MetricsService/internal/logger"
 	"github.com/MaxBoych/MetricsService/internal/storage"
@@ -20,6 +21,7 @@ func main() {
 
 	router := chi.NewRouter()
 	router.Use(logger.MiddlewareLogger)
+	router.Use(gzip.MiddlewareGzip)
 
 	router.Get("/", msHandler.GetAllMetrics)
 	router.Route("/value", func(r chi.Router) {
