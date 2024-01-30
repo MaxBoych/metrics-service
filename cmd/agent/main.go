@@ -130,13 +130,17 @@ func sendMetricsJSON(ms *storage.MemStorage, config Config) {
 			}
 
 			var b bytes.Buffer
-			gz := gzip.NewWriter(&b)
-			_, err = gz.Write(jsonBody)
-			if err != nil {
-				log.Printf("Error compressing JSON: %v\n", err)
-				continue
+			if config.useGzip {
+				gz := gzip.NewWriter(&b)
+				_, err = gz.Write(jsonBody)
+				if err != nil {
+					log.Printf("Error compressing JSON: %v\n", err)
+					continue
+				}
+				gz.Close()
+			} else {
+				b.Write(jsonBody)
 			}
-			gz.Close()
 
 			url := fmt.Sprintf("http://%s/update/", config.runAddr)
 			request, err := http.NewRequest("POST", url, &b)
@@ -146,7 +150,9 @@ func sendMetricsJSON(ms *storage.MemStorage, config Config) {
 			}
 
 			request.Header.Set("Content-Type", "application/json")
-			request.Header.Set("Content-Encoding", "gzip")
+			if config.useGzip {
+				request.Header.Set("Content-Encoding", "gzip")
+			}
 
 			response, err := http.DefaultClient.Do(request)
 			if err != nil {
