@@ -40,8 +40,8 @@ func NewMetricsHandler(ms *storage.MemStorage) (handler *MetricsHandler) {
 }
 
 func (handler *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
-	if accept := r.Header.Get("Accept"); accept != "" {
-		w.Header().Set("Content-Type", accept)
+	if accept := r.Header.Get("Accept"); accept == "html/text" {
+		w.Header().Set("Content-Type", "text/html")
 	} else {
 		w.Header().Set("Content-Type", "text/plain")
 	}
