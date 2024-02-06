@@ -34,8 +34,6 @@ func initState() (ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
 func runServer(ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
 	router := chi.NewRouter()
 	router.Use(logger.MiddlewareLogger)
-	//router.Use(gzip.MiddlewareGzip)
-	//router.Use(middleware.Compress(5, "gzip"))
 	router.Use(gzip.MiddlewareGzip)
 
 	router.Get("/", msHandler.GetAllMetrics)

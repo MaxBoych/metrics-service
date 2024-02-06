@@ -9,15 +9,6 @@ import (
 
 func MiddlewareGzip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		/*var headers []string
-		for name, values := range r.Header {
-			for _, value := range values {
-				headers = append(headers, name+": "+value)
-			}
-		}
-		logger.Log.Info(strings.Join(headers, ", "))*/
-
 		resw := w
 
 		acceptEncoding := r.Header.Get("Accept-Encoding")
@@ -32,7 +23,6 @@ func MiddlewareGzip(next http.Handler) http.Handler {
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := strings.Contains(contentEncoding, "gzip")
 		if sendsGzip {
-			//logger.Log.Info("sendsGzip is true!")
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
