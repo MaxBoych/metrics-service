@@ -2,7 +2,6 @@ package gzip
 
 import (
 	"compress/gzip"
-	//"github.com/MaxBoych/MetricsService/internal/logger"
 	"io"
 	"net/http"
 	"strings"
@@ -17,17 +16,24 @@ func MiddlewareGzipReader(next http.Handler) http.Handler {
 				headers = append(headers, name+": "+value)
 			}
 		}
-		logger.Log.Info(strings.Join(headers, ", "))
+		logger.Log.Info(strings.Join(headers, ", "))*/
 
 		resw := w
 
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		if supportsGzip {
-			logger.Log.Info("supportsGzip is true!")
+			//logger.Log.Info("supportsGzip is true!")
+			w.Header().Set("Content-Encoding", "gzip")
 			cw := newCompressWriter(w)
 			resw = cw
 			defer cw.Close()
+		}
+
+		/*acceptEncoding := r.Header.Get("Accept-Encoding")
+		supportsGzip := strings.Contains(acceptEncoding, "gzip")
+		if supportsGzip {
+			w.Header().Set("Content-Encoding", "gzip")
 		}*/
 
 		contentEncoding := r.Header.Get("Content-Encoding")
@@ -39,12 +45,11 @@ func MiddlewareGzipReader(next http.Handler) http.Handler {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			w.Header().Set("Content-Encoding", "gzip")
 			r.Body = cr
 			defer cr.Close()
 		}
 
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(resw, r)
 	})
 }
 
@@ -69,9 +74,9 @@ func (c *compressWriter) Write(p []byte) (int, error) {
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
-	if statusCode < 300 {
+	/*if statusCode < 300 {
 		c.w.Header().Set("Content-Encoding", "gzip")
-	}
+	}*/
 	c.w.WriteHeader(statusCode)
 }
 
