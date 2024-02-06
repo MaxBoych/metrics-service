@@ -13,8 +13,6 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"time"
-
-	_ "github.com/jackc/pgx/v4"
 )
 
 func main() {

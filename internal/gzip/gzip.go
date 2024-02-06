@@ -39,6 +39,7 @@ func MiddlewareGzipReader(next http.Handler) http.Handler {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			w.Header().Set("Content-Encoding", "gzip")
 			r.Body = cr
 			defer cr.Close()
 		}
