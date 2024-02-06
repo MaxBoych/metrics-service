@@ -17,6 +17,7 @@ type Repository interface {
 	GetGauge(name string) (string, bool)
 	GetCounter(name string) (string, bool)
 	GetAllMetrics() []string
+	PingDB() error
 }
 
 type MetricsHandler struct {
@@ -217,4 +218,13 @@ func (handler *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (handler *MetricsHandler) PingDB(w http.ResponseWriter, r *http.Request) {
+	err := handler.MS.PingDB()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

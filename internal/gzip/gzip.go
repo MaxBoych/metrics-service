@@ -2,16 +2,16 @@ package gzip
 
 import (
 	"compress/gzip"
-	"github.com/MaxBoych/MetricsService/internal/logger"
+	//"github.com/MaxBoych/MetricsService/internal/logger"
 	"io"
 	"net/http"
 	"strings"
 )
 
-func MiddlewareGzip(next http.Handler) http.Handler {
+func MiddlewareGzipReader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		var headers []string
+		/*var headers []string
 		for name, values := range r.Header {
 			for _, value := range values {
 				headers = append(headers, name+": "+value)
@@ -28,12 +28,12 @@ func MiddlewareGzip(next http.Handler) http.Handler {
 			cw := newCompressWriter(w)
 			resw = cw
 			defer cw.Close()
-		}
+		}*/
 
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := strings.Contains(contentEncoding, "gzip")
 		if sendsGzip {
-			logger.Log.Info("sendsGzip is true!")
+			//logger.Log.Info("sendsGzip is true!")
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -43,7 +43,7 @@ func MiddlewareGzip(next http.Handler) http.Handler {
 			defer cr.Close()
 		}
 
-		next.ServeHTTP(resw, r)
+		next.ServeHTTP(w, r)
 	})
 }
 

@@ -1,17 +1,30 @@
 package storage
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/MaxBoych/MetricsService/internal/logger"
+	"github.com/jackc/pgx/v4"
+	"go.uber.org/zap"
+	"os"
 	"sync"
 )
 
 type Gauge float64
 type Counter int64
 
-type MemStorage struct {
+type MemStorageData struct {
 	Gauges   map[string]Gauge
 	Counters map[string]Counter
+}
+
+type MemStorage struct {
+	MemStorageData
 	Mu       sync.Mutex
+	FilePath string
+	AutoSave bool
+	db       *pgx.Conn
 }
 
 func NewMemStorage() (storage *MemStorage) {
@@ -23,6 +36,9 @@ func NewMemStorage() (storage *MemStorage) {
 }
 
 func (ms *MemStorage) GetAllMetrics() (metrics []string) {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+
 	for k, v := range ms.Gauges {
 		metrics = append(metrics, fmt.Sprintf("%s: %v", k, v))
 	}
@@ -33,6 +49,9 @@ func (ms *MemStorage) GetAllMetrics() (metrics []string) {
 }
 
 func (ms *MemStorage) GetGauge(name string) (string, bool) {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+
 	if value, ok := ms.Gauges[name]; ok {
 		value := fmt.Sprintf("%v", value)
 		return value, true
@@ -41,6 +60,9 @@ func (ms *MemStorage) GetGauge(name string) (string, bool) {
 }
 
 func (ms *MemStorage) GetCounter(name string) (string, bool) {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+
 	if value, ok := ms.Counters[name]; ok {
 		value := fmt.Sprintf("%v", value)
 		return value, true
@@ -49,15 +71,29 @@ func (ms *MemStorage) GetCounter(name string) (string, bool) {
 }
 
 func (ms *MemStorage) UpdateGauge(name string, new Gauge) Gauge {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+
 	ms.Gauges[name] = new
 	ms.Count()
+
+	if ms.AutoSave {
+		ms.saveOnChange()
+	}
 
 	return ms.Gauges[name]
 }
 
 func (ms *MemStorage) UpdateCounter(name string, new Counter) Counter {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+
 	ms.Counters[name] += new
 	ms.Count()
+
+	if ms.AutoSave {
+		ms.saveOnChange()
+	}
 
 	return ms.Counters[name]
 }
@@ -66,7 +102,65 @@ func (ms *MemStorage) Count() {
 	ms.Counters["PollCount"]++
 }
 
+func (ms *MemStorage) LoadFromFile() error {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+
+	data, err := os.ReadFile(ms.FilePath)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, ms); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ms *MemStorage) saveOnChange() {
+	err := ms.storeToFile()
+	if err != nil {
+		logger.Log.Info("ERROR store to file", zap.String("error", err.Error()))
+	}
+}
+
+func (ms *MemStorage) StoreToFile() error {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+	return ms.storeToFile()
+}
+
+func (ms *MemStorage) storeToFile() error {
+	data, err := json.MarshalIndent(ms, "", "   ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(ms.FilePath, data, 0666)
+}
+
+func (ms *MemStorage) SetDB(db *pgx.Conn) {
+	ms.db = db
+}
+
+func (ms *MemStorage) PingDB() error {
+	err := ms.db.Ping(context.Background())
+	if err != nil {
+		logger.Log.Error("Unable to ping database", zap.String("err", err.Error()))
+		return err
+	}
+	logger.Log.Error("successfully pinged to database")
+	return nil
+}
+
+func (ms *MemStorage) CloseDB() {
+	if ms.db != nil {
+		ms.db.Close(context.Background())
+	}
+}
+
 func (ms *MemStorage) Init() {
+	ms.Mu.Lock()
+	defer ms.Mu.Unlock()
+
 	ms.Counters = map[string]Counter{
 		"PollCount": Counter(0),
 	}
