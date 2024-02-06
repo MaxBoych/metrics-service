@@ -8,7 +8,6 @@ import (
 	"github.com/MaxBoych/MetricsService/internal/logger"
 	"github.com/MaxBoych/MetricsService/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v4"
 	"go.uber.org/zap"
 	"net/http"
@@ -36,8 +35,8 @@ func runServer(ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
 	router := chi.NewRouter()
 	router.Use(logger.MiddlewareLogger)
 	//router.Use(gzip.MiddlewareGzip)
-	router.Use(middleware.Compress(5, "gzip"))
-	router.Use(gzip.MiddlewareGzipReader)
+	//router.Use(middleware.Compress(5, "gzip"))
+	router.Use(gzip.MiddlewareGzip)
 
 	router.Get("/", msHandler.GetAllMetrics)
 	router.Route("/value", func(r chi.Router) {

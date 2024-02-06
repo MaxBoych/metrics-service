@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func MiddlewareGzipReader(next http.Handler) http.Handler {
+func MiddlewareGzip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		/*var headers []string
@@ -23,18 +23,11 @@ func MiddlewareGzipReader(next http.Handler) http.Handler {
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		if supportsGzip {
-			//logger.Log.Info("supportsGzip is true!")
 			w.Header().Set("Content-Encoding", "gzip")
 			cw := newCompressWriter(w)
 			resw = cw
 			defer cw.Close()
 		}
-
-		/*acceptEncoding := r.Header.Get("Accept-Encoding")
-		supportsGzip := strings.Contains(acceptEncoding, "gzip")
-		if supportsGzip {
-			w.Header().Set("Content-Encoding", "gzip")
-		}*/
 
 		contentEncoding := r.Header.Get("Content-Encoding")
 		sendsGzip := strings.Contains(contentEncoding, "gzip")
@@ -74,9 +67,6 @@ func (c *compressWriter) Write(p []byte) (int, error) {
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
-	/*if statusCode < 300 {
-		c.w.Header().Set("Content-Encoding", "gzip")
-	}*/
 	c.w.WriteHeader(statusCode)
 }
 
