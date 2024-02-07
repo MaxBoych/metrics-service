@@ -1,28 +1,27 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/gzip"
 	"github.com/MaxBoych/MetricsService/internal/handlers"
 	"github.com/MaxBoych/MetricsService/internal/logger"
 	"github.com/MaxBoych/MetricsService/internal/storage"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v4"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
 )
 
 func main() {
-	ms, msHandler := initState()
-	defer ms.CloseDB()
-	runServer(ms, msHandler)
+	ms, msHandler, db := initState()
+	defer db.CloseDB()
+	runServer(ms, msHandler, db)
 }
 
-func initState() (ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
+func initState() (ms *storage.MemStorage, msHandler *handlers.MetricsHandler, db *storage.DBStorage) {
 	ms = storage.NewMemStorage()
-	msHandler = handlers.NewMetricsHandler(ms)
+	db = storage.NewDBStorage()
+	msHandler = handlers.NewMetricsHandler(ms, db)
 
 	if err := logger.Initialize("INFO"); err != nil {
 		fmt.Printf("logger init error: %v\n", err)
@@ -31,7 +30,7 @@ func initState() (ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
 	return
 }
 
-func runServer(ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
+func runServer(ms *storage.MemStorage, msHandler *handlers.MetricsHandler, db *storage.DBStorage) {
 	router := chi.NewRouter()
 	router.Use(logger.MiddlewareLogger)
 	router.Use(gzip.MiddlewareGzip)
@@ -68,7 +67,8 @@ func runServer(ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
 		handlers.BadRequest(w, r)
 	})
 
-	cfg := configure(ms)
+	fs := storage.NewFileStorage(ms)
+	cfg := configure(fs, db)
 
 	logger.Log.Info("running server", zap.String("address", cfg.runAddr))
 	if err := http.ListenAndServe(cfg.runAddr, router); err != nil {
@@ -76,11 +76,12 @@ func runServer(ms *storage.MemStorage, msHandler *handlers.MetricsHandler) {
 	}
 }
 
-func configure(ms *storage.MemStorage) (config Config) {
+func configure(fs *storage.FileStorage, db *storage.DBStorage) (config Config) {
 	config = parseConfig()
-	ms.FilePath = config.fileStoragePath
+	fs.SetConfigValues(config.fileStoragePath, config.storeInterval == 0)
+
 	if config.restore {
-		err := ms.LoadFromFile()
+		err := fs.LoadFromFile()
 		if err != nil {
 			logger.Log.Error("ERROR load from file", zap.String("error", err.Error()))
 		}
@@ -90,30 +91,18 @@ func configure(ms *storage.MemStorage) (config Config) {
 			for {
 				time.Sleep(time.Duration(config.storeInterval) * time.Second)
 
-				err := ms.StoreToFile()
+				err := fs.StoreToFile()
 				if err != nil {
 					logger.Log.Error("ERROR store to file", zap.String("error", err.Error()))
 				}
 			}
 		}()
-	} else if config.storeInterval == 0 {
-		ms.AutoSave = true
 	}
 
 	logger.Log.Info("INFO config.databaseDSN != \"\"", zap.String("info", config.databaseDSN))
 	if config.databaseDSN != "" {
-		connectDB(config.databaseDSN, ms)
+		db.Connect(config.databaseDSN)
 	}
 
 	return
-}
-
-func connectDB(url string, ms *storage.MemStorage) {
-	conn, err := pgx.Connect(context.Background(), url)
-	if err != nil {
-		logger.Log.Error("Unable to connect to database", zap.String("err", err.Error()))
-		return
-	}
-	logger.Log.Info("connecting to database", zap.String("address", url))
-	ms.SetDB(conn)
 }

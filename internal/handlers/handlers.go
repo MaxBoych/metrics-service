@@ -10,18 +10,17 @@ import (
 )
 
 type Repository interface {
-	Init()
 	UpdateGauge(name string, new storage.Gauge) storage.Gauge
 	UpdateCounter(name string, new storage.Counter) storage.Counter
 	Count()
 	GetGauge(name string) (string, bool)
 	GetCounter(name string) (string, bool)
 	GetAllMetrics() []string
-	PingDB() error
 }
 
 type MetricsHandler struct {
-	MS Repository
+	ms Repository
+	db *storage.DBStorage
 }
 
 func NotFound(w http.ResponseWriter, r *http.Request) {
@@ -32,21 +31,22 @@ func BadRequest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-func NewMetricsHandler(ms *storage.MemStorage) (handler *MetricsHandler) {
+func NewMetricsHandler(ms *storage.MemStorage, db *storage.DBStorage) (handler *MetricsHandler) {
 	handler = &MetricsHandler{
-		MS: ms,
+		ms: ms,
+		db: db,
 	}
 	return
 }
 
-func (handler *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	if accept := r.Header.Get("Accept"); accept == "html/text" {
 		w.Header().Set("Content-Type", "text/html")
 	} else {
 		w.Header().Set("Content-Type", "text/plain")
 	}
 
-	metrics := handler.MS.GetAllMetrics()
+	metrics := o.ms.GetAllMetrics()
 	var result []byte
 	for _, metric := range metrics {
 		result = append(result, []byte(metric)...)
@@ -58,13 +58,13 @@ func (handler *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (handler *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
 	var value string
 	var ok bool
-	if value, ok = handler.MS.GetGauge(name); !ok {
+	if value, ok = o.ms.GetGauge(name); !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -75,13 +75,13 @@ func (handler *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (handler *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
 	var value string
 	var ok bool
-	if value, ok = handler.MS.GetCounter(name); !ok {
+	if value, ok = o.ms.GetCounter(name); !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -92,33 +92,33 @@ func (handler *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (handler *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
 	value := chi.URLParam(r, "value")
 	if value, err := strconv.ParseFloat(value, 64); err == nil {
-		handler.MS.UpdateGauge(name, storage.Gauge(value))
+		o.ms.UpdateGauge(name, storage.Gauge(value))
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 }
 
-func (handler *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
 	value := chi.URLParam(r, "value")
 	if value, err := strconv.ParseInt(value, 10, 64); err == nil {
-		handler.MS.UpdateCounter(name, storage.Counter(value))
+		o.ms.UpdateCounter(name, storage.Counter(value))
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 }
 
-func (handler *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var metrics models.Metrics
@@ -138,14 +138,14 @@ func (handler *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.R
 	metricType := metrics.MType
 	var resp models.Metrics
 	if metricType == "gauge" {
-		g := float64(handler.MS.UpdateGauge(metricName, storage.Gauge(*metrics.Value)))
+		g := float64(o.ms.UpdateGauge(metricName, storage.Gauge(*metrics.Value)))
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: "gauge",
 			Value: &g,
 		}
 	} else if metricType == "counter" {
-		c := int64(handler.MS.UpdateCounter(metricName, storage.Counter(*metrics.Delta)))
+		c := int64(o.ms.UpdateCounter(metricName, storage.Counter(*metrics.Delta)))
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: "counter",
@@ -166,7 +166,7 @@ func (handler *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (handler *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var metrics models.Metrics
@@ -186,7 +186,7 @@ func (handler *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Requ
 	metricType := metrics.MType
 	var resp models.Metrics
 	if metricType == "gauge" {
-		gStr, ok := handler.MS.GetGauge(metricName)
+		gStr, ok := o.ms.GetGauge(metricName)
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -198,7 +198,7 @@ func (handler *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Requ
 			Value: &g,
 		}
 	} else if metricType == "counter" {
-		cStr, ok := handler.MS.GetCounter(metricName)
+		cStr, ok := o.ms.GetCounter(metricName)
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -224,8 +224,8 @@ func (handler *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (handler *MetricsHandler) PingDB(w http.ResponseWriter, r *http.Request) {
-	err := handler.MS.PingDB()
+func (o *MetricsHandler) PingDB(w http.ResponseWriter, r *http.Request) {
+	err := o.db.Ping()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

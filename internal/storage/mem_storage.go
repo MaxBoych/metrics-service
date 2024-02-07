@@ -1,171 +1,112 @@
 package storage
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/MaxBoych/MetricsService/internal/logger"
-	"github.com/jackc/pgx/v4"
-	"go.uber.org/zap"
-	"os"
 	"sync"
 )
 
 type Gauge float64
 type Counter int64
 
-type MemStorageData struct {
+type Data struct {
 	Gauges   map[string]Gauge
 	Counters map[string]Counter
 }
 
 type MemStorage struct {
-	MemStorageData
-	Mu       sync.Mutex
-	FilePath string
-	AutoSave bool
-	db       *pgx.Conn
+	*Data
+	Mu       sync.RWMutex
+	onChange func()
 }
 
 func NewMemStorage() (storage *MemStorage) {
 	storage = &MemStorage{}
 	// Оставил функцию init, так как в ней содержится информация о метриках, что занимает слишком много места.
 	// Пусть лучше это будет отдельной вспомогательной функцией.
-	storage.Init()
+	storage.init()
 	return
 }
 
-func (ms *MemStorage) GetAllMetrics() (metrics []string) {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
+func (o *MemStorage) SetOnChange(callback func()) {
+	o.onChange = callback
+}
 
-	for k, v := range ms.Gauges {
+func (o *MemStorage) GetAllMetrics() (metrics []string) {
+	o.Mu.Lock()
+	defer o.Mu.Unlock()
+
+	for k, v := range o.Gauges {
 		metrics = append(metrics, fmt.Sprintf("%s: %v", k, v))
 	}
-	for k, v := range ms.Counters {
+	for k, v := range o.Counters {
 		metrics = append(metrics, fmt.Sprintf("%s: %v", k, v))
 	}
 	return
 }
 
-func (ms *MemStorage) GetGauge(name string) (string, bool) {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
+func (o *MemStorage) GetGauge(name string) (string, bool) {
+	o.Mu.Lock()
+	defer o.Mu.Unlock()
 
-	if value, ok := ms.Gauges[name]; ok {
+	if value, ok := o.Gauges[name]; ok {
 		value := fmt.Sprintf("%v", value)
 		return value, true
 	}
 	return "", false
 }
 
-func (ms *MemStorage) GetCounter(name string) (string, bool) {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
+func (o *MemStorage) GetCounter(name string) (string, bool) {
+	o.Mu.Lock()
+	defer o.Mu.Unlock()
 
-	if value, ok := ms.Counters[name]; ok {
+	if value, ok := o.Counters[name]; ok {
 		value := fmt.Sprintf("%v", value)
 		return value, true
 	}
 	return "", false
 }
 
-func (ms *MemStorage) UpdateGauge(name string, new Gauge) Gauge {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
+func (o *MemStorage) UpdateGauge(name string, new Gauge) Gauge {
+	o.Mu.Lock()
+	defer o.Mu.Unlock()
 
-	ms.Gauges[name] = new
-	ms.Count()
+	o.Gauges[name] = new
+	o.Count()
 
-	if ms.AutoSave {
-		ms.saveOnChange()
+	if o.onChange != nil {
+		o.onChange()
 	}
 
-	return ms.Gauges[name]
+	return o.Gauges[name]
 }
 
-func (ms *MemStorage) UpdateCounter(name string, new Counter) Counter {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
+func (o *MemStorage) UpdateCounter(name string, new Counter) Counter {
+	o.Mu.Lock()
+	defer o.Mu.Unlock()
 
-	ms.Counters[name] += new
-	ms.Count()
+	o.Counters[name] += new
+	o.Count()
 
-	if ms.AutoSave {
-		ms.saveOnChange()
+	if o.onChange != nil {
+		o.onChange()
 	}
 
-	return ms.Counters[name]
+	return o.Counters[name]
 }
 
-func (ms *MemStorage) Count() {
-	ms.Counters["PollCount"]++
+func (o *MemStorage) Count() {
+	o.Counters["PollCount"]++
 }
 
-func (ms *MemStorage) LoadFromFile() error {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
+func (o *MemStorage) init() {
+	o.Mu.Lock()
+	defer o.Mu.Unlock()
 
-	data, err := os.ReadFile(ms.FilePath)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, ms); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (ms *MemStorage) saveOnChange() {
-	err := ms.storeToFile()
-	if err != nil {
-		logger.Log.Info("ERROR store to file", zap.String("error", err.Error()))
-	}
-}
-
-func (ms *MemStorage) StoreToFile() error {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
-	return ms.storeToFile()
-}
-
-func (ms *MemStorage) storeToFile() error {
-	data, err := json.MarshalIndent(ms, "", "   ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(ms.FilePath, data, 0666)
-}
-
-func (ms *MemStorage) SetDB(db *pgx.Conn) {
-	ms.db = db
-}
-
-func (ms *MemStorage) PingDB() error {
-	err := ms.db.Ping(context.Background())
-	if err != nil {
-		logger.Log.Error("Unable to ping database", zap.String("err", err.Error()))
-		return err
-	}
-	logger.Log.Error("successfully pinged to database")
-	return nil
-}
-
-func (ms *MemStorage) CloseDB() {
-	if ms.db != nil {
-		ms.db.Close(context.Background())
-	}
-}
-
-func (ms *MemStorage) Init() {
-	ms.Mu.Lock()
-	defer ms.Mu.Unlock()
-
-	ms.Counters = map[string]Counter{
+	o.Counters = map[string]Counter{
 		"PollCount": Counter(0),
 	}
 
-	ms.Gauges = map[string]Gauge{
+	o.Gauges = map[string]Gauge{
 
 		//Alloc: метрика показывает количество байтов, которые в данный момент активно используются вашей программой.
 		//Это не включает память, которая была выделена, но уже освобождена сборщиком мусора.

@@ -81,12 +81,12 @@ func sendMetrics(ms *storage.MemStorage, config Config) {
 
 		var gaugesCopy map[string]storage.Gauge
 
-		ms.Mu.Lock()
+		ms.Mu.RLock()
 		gaugesCopy = make(map[string]storage.Gauge, len(ms.Gauges))
 		for k, v := range ms.Gauges {
 			gaugesCopy[k] = v
 		}
-		ms.Mu.Unlock()
+		ms.Mu.RUnlock()
 
 		for key, value := range gaugesCopy {
 			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.runAddr, key, fmt.Sprint(value))
@@ -109,12 +109,12 @@ func sendMetricsJSON(ms *storage.MemStorage, config Config) {
 
 		var gaugesCopy map[string]storage.Gauge
 
-		ms.Mu.Lock()
+		ms.Mu.RLock()
 		gaugesCopy = make(map[string]storage.Gauge, len(ms.Gauges))
 		for k, v := range ms.Gauges {
 			gaugesCopy[k] = v
 		}
-		ms.Mu.Unlock()
+		ms.Mu.RUnlock()
 
 		for key, value := range gaugesCopy {
 
