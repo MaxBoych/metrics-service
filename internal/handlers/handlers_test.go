@@ -13,7 +13,7 @@ import (
 
 func TestMetricsHandler_UpdateGaugeMetric(t *testing.T) {
 	ms := storage.NewMemStorage()
-	msHandler := NewMetricsHandler(ms)
+	msHandler := NewMetricsHandler(ms, nil)
 
 	router := chi.NewRouter()
 	router.Post("/update/gauge/{name}/{value}", msHandler.UpdateGaugeMetric)
@@ -102,7 +102,7 @@ func TestMetricsHandler_UpdateGaugeMetric(t *testing.T) {
 
 func TestMetricsHandler_UpdateCounterMetric(t *testing.T) {
 	ms := storage.NewMemStorage()
-	msHandler := NewMetricsHandler(ms)
+	msHandler := NewMetricsHandler(ms, nil)
 
 	router := chi.NewRouter()
 	router.Post("/update/counter/{name}/{value}", msHandler.UpdateCounterMetric)
@@ -174,7 +174,7 @@ func TestMetricsHandler_UpdateCounterMetric(t *testing.T) {
 func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
 	ms := storage.NewMemStorage()
 	ms.Gauges["testGauge"] = 1155
-	msHandler := NewMetricsHandler(ms)
+	msHandler := NewMetricsHandler(ms, nil)
 
 	router := chi.NewRouter()
 	router.Get("/value/gauge/{name}", msHandler.GetGaugeMetric)
@@ -232,7 +232,7 @@ func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
 func TestMetricsHandler_GetCounterMetric(t *testing.T) {
 	ms := storage.NewMemStorage()
 	ms.Counters["testCounter"] = 1177
-	msHandler := NewMetricsHandler(ms)
+	msHandler := NewMetricsHandler(ms, nil)
 
 	router := chi.NewRouter()
 	router.Get("/value/counter/{name}", msHandler.GetCounterMetric)
