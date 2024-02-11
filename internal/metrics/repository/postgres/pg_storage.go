@@ -29,6 +29,13 @@ func (o *PGStorage) Connect(url string) error {
 	}
 	logger.Log.Info("connecting to database", zap.String("address", url))
 	o.db = conn
+	err = o.db.Ping(context.Background())
+	if err != nil {
+		logger.Log.Error("Cannot to ping database", zap.String("err", err.Error()))
+		return err
+	} else {
+		logger.Log.Error("PING was fine")
+	}
 
 	return nil
 }
@@ -91,7 +98,8 @@ func (o *PGStorage) Init() error {
 	query, args, err := squirrel.Insert(CountersTableName).
 		Columns(NameColumnName, ValueColumnName).
 		Values(PollCountCounterName, 0).
-		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
+		PlaceholderFormat(squirrel.Dollar).
+		//Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
 		ToSql()
 	if err != nil {
 		logger.Log.Error("Cannot to build INSERT query", zap.String("err", err.Error()))
