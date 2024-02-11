@@ -27,10 +27,6 @@ func NewFileStorage(ms *memory.MemStorage) *FileStorage {
 func (o *FileStorage) SetConfigValues(filePath string, autoSave bool) {
 	o.filePath = filePath
 	o.autoSave = autoSave
-
-	/*if autoSave {
-		o.ms.SetOnChange(o.saveOnChange)
-	}*/
 }
 
 func (o *FileStorage) LoadFromFile() error {

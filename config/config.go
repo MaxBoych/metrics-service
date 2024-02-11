@@ -35,10 +35,10 @@ func (o *Config) ParseConfig() {
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		o.RunAddr = envRunAddr
 	}
-	if envFileStoragePath := os.Getenv("ADDRESS"); envFileStoragePath != "" {
+	if envFileStoragePath := os.Getenv("FILE_STORAGE_PATH"); envFileStoragePath != "" {
 		o.FileStoragePath = envFileStoragePath
 	}
-	if envRestore, err := strconv.ParseBool(os.Getenv("ADDRESS")); err == nil {
+	if envRestore, err := strconv.ParseBool(os.Getenv("RESTORE")); err == nil {
 		o.Restore = envRestore
 	}
 	if envStoreInterval, err := strconv.Atoi(os.Getenv("STORE_INTERVAL")); err == nil {
