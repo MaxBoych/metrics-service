@@ -92,7 +92,6 @@ func (o *Config) ConfigureFS(ms *memory.MemStorage) *file.FileStorage {
 			err := fs.LoadFromFile()
 			if err != nil {
 				logger.Log.Error("ERROR load from file", zap.String("error", err.Error()))
-				return nil
 			}
 		}
 
@@ -100,7 +99,7 @@ func (o *Config) ConfigureFS(ms *memory.MemStorage) *file.FileStorage {
 			go func() {
 				for {
 					time.Sleep(time.Duration(o.StoreInterval) * time.Second)
-
+					logger.Log.Error("store interval pass")
 					err := fs.StoreToFile()
 					if err != nil {
 						logger.Log.Error("ERROR store to file", zap.String("error", err.Error()))
