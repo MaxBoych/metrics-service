@@ -29,6 +29,18 @@ func (o *FileStorage) SetConfigValues(filePath string, autoSave bool) {
 	o.autoSave = autoSave
 }
 
+func (o *FileStorage) CreateFileIfNotExists() error {
+	_, err := os.Stat(o.filePath)
+	if os.IsNotExist(err) {
+		file, err := os.Create(o.filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+	}
+	return nil
+}
+
 func (o *FileStorage) LoadFromFile() error {
 	o.Mu.Lock()
 	defer o.Mu.Unlock()

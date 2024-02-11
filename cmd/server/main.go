@@ -8,6 +8,7 @@ import (
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/MaxBoych/MetricsService/internal/server"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -27,6 +28,7 @@ func setupServer() {
 	// setup config
 	cfg := config.NewConfig()
 	cfg.ParseConfig()
+	logger.Log.Info("PARSE DATA", zap.String("data", cfg.String()))
 
 	var repo metrics.Repository
 

@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/file"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/postgres"
@@ -18,6 +19,11 @@ type Config struct {
 	Restore         bool
 	StoreInterval   int
 	DatabaseDSN     string
+}
+
+func (o *Config) String() string {
+	return fmt.Sprintf("address: %s, filePath: %s, restore: %t, storeInterval: %d, database: %s",
+		o.RunAddr, o.FileStoragePath, o.Restore, o.StoreInterval, o.DatabaseDSN)
 }
 
 func NewConfig() *Config {
@@ -75,6 +81,12 @@ func (o *Config) ConfigureFS(ms *memory.MemStorage) *file.FileStorage {
 	fs := file.NewFileStorage(ms)
 	if o.FileStoragePath != "" {
 		fs.SetConfigValues(o.FileStoragePath, o.StoreInterval == 0)
+
+		err := fs.CreateFileIfNotExists()
+		if err != nil {
+			logger.Log.Error("ERROR create file", zap.String("error", err.Error()))
+			return nil
+		}
 
 		if o.Restore {
 			err := fs.LoadFromFile()
