@@ -1,12 +1,15 @@
 package memory
 
 import (
+	"context"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestMemStorage_UpdateGauge(t *testing.T) {
+	ctx := context.Background()
+
 	type want struct {
 		gauges   map[string]models.Gauge
 		counters map[string]models.Counter
@@ -30,7 +33,7 @@ func TestMemStorage_UpdateGauge(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.gauges {
-				ms.UpdateGauge(name, value)
+				ms.UpdateGauge(ctx, name, value)
 			}
 
 			for name, wanted := range test.want.gauges {
@@ -44,6 +47,8 @@ func TestMemStorage_UpdateGauge(t *testing.T) {
 }
 
 func TestMemStorage_UpdateCounter(t *testing.T) {
+	ctx := context.Background()
+
 	type want struct {
 		counters map[string]models.Counter
 	}
@@ -65,8 +70,8 @@ func TestMemStorage_UpdateCounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.counters {
-				ms.UpdateCounter(name, value)
-				ms.UpdateCounter(name, value)
+				ms.UpdateCounter(ctx, name, value)
+				ms.UpdateCounter(ctx, name, value)
 			}
 
 			for name, wanted := range test.want.counters {
@@ -80,8 +85,10 @@ func TestMemStorage_UpdateCounter(t *testing.T) {
 }
 
 func TestMemStorage_GetGauge(t *testing.T) {
+	ctx := context.Background()
+
 	type want struct {
-		gauges map[string]string
+		gauges map[string]models.Gauge
 	}
 	tests := []struct {
 		name   string
@@ -90,9 +97,9 @@ func TestMemStorage_GetGauge(t *testing.T) {
 	}{
 		{
 			name:   "GET GAUGE pass test 1",
-			gauges: map[string]models.Gauge{"a": 123, "b": 456, "c": 789},
+			gauges: map[string]models.Gauge{"a": 123.0, "b": 456.0, "c": 789.0},
 			want: want{
-				gauges: map[string]string{"a": "123", "b": "456", "c": "789"},
+				gauges: map[string]models.Gauge{"a": 123.0, "b": 456.0, "c": 789.0},
 			},
 		},
 	}
@@ -101,21 +108,23 @@ func TestMemStorage_GetGauge(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.gauges {
-				ms.UpdateGauge(name, value)
+				ms.UpdateGauge(ctx, name, value)
 			}
 
 			for name, wanted := range test.want.gauges {
-				value := ms.GetGauge(name)
+				value := ms.GetGauge(ctx, name)
 				assert.NotNilf(t, value, "Name '%s' must exist in the repository", name)
-				assert.Equalf(t, wanted, value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
+				assert.Equalf(t, wanted, *value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value.String())
 			}
 		})
 	}
 }
 
 func TestMemStorage_GetCounter(t *testing.T) {
+	ctx := context.Background()
+
 	type want struct {
-		counters map[string]string
+		counters map[string]models.Counter
 	}
 	tests := []struct {
 		name     string
@@ -126,7 +135,7 @@ func TestMemStorage_GetCounter(t *testing.T) {
 			name:     "GET COUNTER pass test 1",
 			counters: map[string]models.Counter{"a": 123, "b": 456, "c": 789},
 			want: want{
-				counters: map[string]string{"a": "123", "b": "456", "c": "789"},
+				counters: map[string]models.Counter{"a": 123, "b": 456, "c": 789},
 			},
 		},
 	}
@@ -135,13 +144,13 @@ func TestMemStorage_GetCounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.counters {
-				ms.UpdateCounter(name, value)
+				ms.UpdateCounter(ctx, name, value)
 			}
 
 			for name, wanted := range test.want.counters {
-				value := ms.GetCounter(name)
+				value := ms.GetCounter(ctx, name)
 				assert.NotNilf(t, value, "Name '%s' must exist in the repository", name)
-				assert.Equalf(t, wanted, value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
+				assert.Equalf(t, wanted, *value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
 			}
 		})
 	}

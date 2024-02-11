@@ -1,7 +1,9 @@
 package delivery
 
 import (
+	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
+	"github.com/MaxBoych/MetricsService/internal/metrics/usecase"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +15,8 @@ import (
 
 func TestMetricsHandler_UpdateGaugeMetric(t *testing.T) {
 	ms := memory.NewMemStorage()
-	msHandler := NewMetricsHandler(ms, nil)
+	useCase := usecase.NewMetricsUseCase(ms)
+	msHandler := NewMetricsHandler(useCase)
 
 	router := chi.NewRouter()
 	router.Post("/update/gauge/{name}/{value}", msHandler.UpdateGaugeMetric)
@@ -102,7 +105,8 @@ func TestMetricsHandler_UpdateGaugeMetric(t *testing.T) {
 
 func TestMetricsHandler_UpdateCounterMetric(t *testing.T) {
 	ms := memory.NewMemStorage()
-	msHandler := NewMetricsHandler(ms, nil)
+	useCase := usecase.NewMetricsUseCase(ms)
+	msHandler := NewMetricsHandler(useCase)
 
 	router := chi.NewRouter()
 	router.Post("/update/counter/{name}/{value}", msHandler.UpdateCounterMetric)
@@ -173,8 +177,9 @@ func TestMetricsHandler_UpdateCounterMetric(t *testing.T) {
 
 func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
 	ms := memory.NewMemStorage()
-	ms.Gauges["testGauge"] = 1155
-	msHandler := NewMetricsHandler(ms, nil)
+	ms.Gauges["testGauge"] = 1155.0
+	useCase := usecase.NewMetricsUseCase(ms)
+	msHandler := NewMetricsHandler(useCase)
 
 	router := chi.NewRouter()
 	router.Get("/value/gauge/{name}", msHandler.GetGaugeMetric)
@@ -200,7 +205,7 @@ func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
 			want: want{
 				code:        200,
 				contentType: "text/plain",
-				value:       "1155",
+				value:       fmt.Sprintf("%f", float64(1155)),
 			},
 		},
 		{
@@ -232,7 +237,8 @@ func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
 func TestMetricsHandler_GetCounterMetric(t *testing.T) {
 	ms := memory.NewMemStorage()
 	ms.Counters["testCounter"] = 1177
-	msHandler := NewMetricsHandler(ms, nil)
+	useCase := usecase.NewMetricsUseCase(ms)
+	msHandler := NewMetricsHandler(useCase)
 
 	router := chi.NewRouter()
 	router.Get("/value/counter/{name}", msHandler.GetCounterMetric)
@@ -258,7 +264,7 @@ func TestMetricsHandler_GetCounterMetric(t *testing.T) {
 			want: want{
 				code:        200,
 				contentType: "text/plain",
-				value:       "1177",
+				value:       fmt.Sprintf("%d", int64(1177)),
 			},
 		},
 		{

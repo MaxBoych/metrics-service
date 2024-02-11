@@ -9,7 +9,6 @@ import (
 type MemStorage struct {
 	*models.Data
 	Mu sync.RWMutex
-	//onChange func()
 }
 
 func NewMemStorage() (ms *MemStorage) {
@@ -19,10 +18,6 @@ func NewMemStorage() (ms *MemStorage) {
 	ms.init()
 	return
 }
-
-/*func (o *MemStorage) SetOnChange(callback func()) {
-	o.onChange = callback
-}*/
 
 func (o *MemStorage) GetAllMetrics(ctx context.Context) *models.Data {
 	o.Mu.RLock()
@@ -58,10 +53,6 @@ func (o *MemStorage) UpdateGauge(ctx context.Context, name string, new models.Ga
 	o.Data.Gauges[name] = new
 	o.count()
 
-	/*if o.onChange != nil {
-		o.onChange()
-	}*/
-
 	gauge := o.Gauges[name]
 	return &gauge
 }
@@ -72,10 +63,6 @@ func (o *MemStorage) UpdateCounter(ctx context.Context, name string, new models.
 
 	o.Counters[name] += new
 	o.count()
-
-	/*if o.onChange != nil {
-		o.onChange()
-	}*/
 
 	counter := o.Counters[name]
 	return &counter

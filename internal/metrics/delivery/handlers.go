@@ -38,13 +38,6 @@ func (o *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 
-	/*ms := o.repo.GetAllMetrics(ctx)
-	var result []byte
-	for _, metric := range metrics {
-		result = append(result, []byte(metric)...)
-		result = append(result, '\n')
-	}*/
-
 	resp := o.useCase.GetAllMetrics(ctx)
 	jsonResp, err := json.Marshal(resp)
 	if err != nil {

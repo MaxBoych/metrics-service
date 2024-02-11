@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -8,11 +9,11 @@ type Gauge float64
 type Counter int64
 
 func (o *Gauge) String() string {
-	return o.String()
+	return fmt.Sprintf("%f", *o)
 }
 
 func (o *Counter) String() string {
-	return o.String()
+	return fmt.Sprintf("%d", *o)
 }
 
 type Data struct {

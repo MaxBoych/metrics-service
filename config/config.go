@@ -47,8 +47,6 @@ func (o *Config) ParseConfig() {
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		o.DatabaseDSN = envDatabaseDSN
 	}
-
-	return
 }
 
 func (o *Config) ConfigureDB() *postgres.PGStorage {
