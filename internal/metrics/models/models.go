@@ -29,7 +29,7 @@ type Metrics struct {
 }
 
 func (o *Metrics) String() string {
-	return fmt.Sprintf("ID: %s, MType: %s, Delta: %d, Value: %g", o.ID, o.MType, o.Delta, o.Value)
+	return fmt.Sprintf("ID: %s, MType: %s, Delta: %d, Value: %g", o.ID, o.MType, *o.Delta, *o.Value)
 }
 
 type GaugeMetric struct {
