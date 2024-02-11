@@ -205,7 +205,7 @@ func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
 			want: want{
 				code:        200,
 				contentType: "text/plain",
-				value:       fmt.Sprintf("%f", float64(1155)),
+				value:       fmt.Sprintf("%g", float64(1155)),
 			},
 		},
 		{
