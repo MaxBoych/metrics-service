@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/postgres"
@@ -41,11 +42,7 @@ func (o *MetricsUseCase) UpdateCounter(ctx context.Context, params models.Metric
 func (o *MetricsUseCase) Ping(ctx context.Context) error {
 	db, ok := o.repo.(*postgres.PGStorage)
 	if ok {
-		err := db.Ping(ctx)
-		if err != nil {
-			return err
-		}
-		return nil
+		return db.Ping(ctx)
 	}
-	return nil
+	return errors.New("repo is not db")
 }

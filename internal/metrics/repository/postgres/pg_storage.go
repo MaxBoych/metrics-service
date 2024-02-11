@@ -49,7 +49,7 @@ func (o *PGStorage) Ping(ctx context.Context) error {
 		logger.Log.Error("Unable to ping database", zap.String("err", err.Error()))
 		return err
 	}
-	logger.Log.Error("successfully pinged to database")
+	logger.Log.Info("successfully pinged to database")
 	return nil
 }
 
