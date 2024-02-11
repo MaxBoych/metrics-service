@@ -40,6 +40,7 @@ func setupServer() {
 	fs := cfg.ConfigureFS(ms)
 	if fs != nil {
 		repo = fs
+		logger.Log.Info("FS is repo")
 	}
 
 	// 1-st priority
@@ -47,6 +48,7 @@ func setupServer() {
 	if db != nil {
 		defer db.Close()
 		repo = db
+		logger.Log.Info("DB is repo")
 	}
 
 	// setup server

@@ -63,6 +63,8 @@ func (o *Config) ConfigureDB() *postgres.PGStorage {
 		if err != nil {
 			logger.Log.Info("ERROR cannot connect to DB", zap.String("err", err.Error()))
 			return nil
+		} else {
+			logger.Log.Info("CONNECT to db is fine")
 		}
 		err = db.Init()
 		if err != nil {

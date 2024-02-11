@@ -29,6 +29,8 @@ func (o *PGStorage) Connect(url string) error {
 	}
 	logger.Log.Info("connecting to database", zap.String("address", url))
 	o.db = conn
+
+	//
 	err = o.db.Ping(context.Background())
 	if err != nil {
 		logger.Log.Error("Cannot to ping database", zap.String("err", err.Error()))
@@ -36,6 +38,7 @@ func (o *PGStorage) Connect(url string) error {
 	} else {
 		logger.Log.Error("PING was fine")
 	}
+	//
 
 	return nil
 }
