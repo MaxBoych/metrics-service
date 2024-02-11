@@ -30,8 +30,8 @@ func (o *FileStorage) SetConfigValues(filePath string, autoSave bool) {
 }
 
 func (o *FileStorage) LoadFromFile() error {
-	o.ms.Mu.Lock()
-	defer o.ms.Mu.Unlock()
+	o.Mu.Lock()
+	defer o.Mu.Unlock()
 
 	data, err := os.ReadFile(o.filePath)
 	if err != nil {

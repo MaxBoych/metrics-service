@@ -28,6 +28,10 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
 }
 
+func (o *Metrics) String() string {
+	return fmt.Sprintf("ID: %s, MType: %s, Delta: %d, Value: %g", o.ID, o.MType, o.Delta, o.Value)
+}
+
 type GaugeMetric struct {
 	ID        int64     `db:"id"`
 	Name      string    `db:"name"`

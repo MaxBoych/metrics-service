@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
+	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 	"net/http"
 	"strconv"
 )
@@ -132,6 +134,7 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	logger.Log.Info("UpdateMetricJSON", zap.String("metric", metric.String()))
 
 	metricName := metric.ID
 	if metricName == "" {
@@ -184,6 +187,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	logger.Log.Info("GetMetricJSON", zap.String("metric", metric.String()))
 
 	metricName := metric.ID
 	if metricName == "" {
