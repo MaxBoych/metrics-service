@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/MaxBoych/MetricsService/internal/storage"
+	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestMetricsHandler_UpdateGaugeMetric(t *testing.T) {
-	ms := storage.NewMemStorage()
+	ms := memory.NewMemStorage()
 	msHandler := NewMetricsHandler(ms, nil)
 
 	router := chi.NewRouter()
@@ -101,7 +101,7 @@ func TestMetricsHandler_UpdateGaugeMetric(t *testing.T) {
 }
 
 func TestMetricsHandler_UpdateCounterMetric(t *testing.T) {
-	ms := storage.NewMemStorage()
+	ms := memory.NewMemStorage()
 	msHandler := NewMetricsHandler(ms, nil)
 
 	router := chi.NewRouter()
@@ -172,7 +172,7 @@ func TestMetricsHandler_UpdateCounterMetric(t *testing.T) {
 }
 
 func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
-	ms := storage.NewMemStorage()
+	ms := memory.NewMemStorage()
 	ms.Gauges["testGauge"] = 1155
 	msHandler := NewMetricsHandler(ms, nil)
 
@@ -230,7 +230,7 @@ func TestMetricsHandler_GetGaugeMetric(t *testing.T) {
 }
 
 func TestMetricsHandler_GetCounterMetric(t *testing.T) {
-	ms := storage.NewMemStorage()
+	ms := memory.NewMemStorage()
 	ms.Counters["testCounter"] = 1177
 	msHandler := NewMetricsHandler(ms, nil)
 

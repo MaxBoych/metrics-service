@@ -1,26 +1,20 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
-	"github.com/MaxBoych/MetricsService/internal/models"
-	"github.com/MaxBoych/MetricsService/internal/storage"
+	"github.com/MaxBoych/MetricsService/internal/metrics"
+	"github.com/MaxBoych/MetricsService/internal/metrics/models"
+	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"strconv"
 )
 
-type Repository interface {
-	UpdateGauge(name string, new storage.Gauge) storage.Gauge
-	UpdateCounter(name string, new storage.Counter) storage.Counter
-	Count()
-	GetGauge(name string) (string, bool)
-	GetCounter(name string) (string, bool)
-	GetAllMetrics() []string
-}
-
 type MetricsHandler struct {
-	ms Repository
-	db *storage.DBStorage
+	//repo metrics.Repository
+	useCase metrics.UseCase
+	//db      *postgres.PGStorage
 }
 
 func NotFound(w http.ResponseWriter, r *http.Request) {
@@ -31,74 +25,88 @@ func BadRequest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-func NewMetricsHandler(ms *storage.MemStorage, db *storage.DBStorage) (handler *MetricsHandler) {
+func NewMetricsHandler(useCase metrics.UseCase) (handler *MetricsHandler) {
 	handler = &MetricsHandler{
-		ms: ms,
-		db: db,
+		useCase: useCase,
 	}
 	return
 }
 
 func (o *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	if accept := r.Header.Get("Accept"); accept == "html/text" {
 		w.Header().Set("Content-Type", "text/html")
 	} else {
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Type", "application/json")
 	}
 
-	metrics := o.ms.GetAllMetrics()
+	/*ms := o.repo.GetAllMetrics(ctx)
 	var result []byte
 	for _, metric := range metrics {
 		result = append(result, []byte(metric)...)
 		result = append(result, '\n')
+	}*/
+
+	resp := o.useCase.GetAllMetrics(ctx)
+	jsonResp, err := json.Marshal(resp)
+	if err != nil {
+		panic(err)
 	}
-	_, err := w.Write(result)
+	_, err = w.Write(jsonResp)
 	if err != nil {
 		panic(err)
 	}
 }
 
 func (o *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
-	var value string
-	var ok bool
-	if value, ok = o.ms.GetGauge(name); !ok {
+	params := models.Metrics{ID: name}
+	var gauge *models.Gauge
+	if gauge = o.useCase.GetGauge(ctx, params); gauge == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	_, err := w.Write([]byte(value))
+	_, err := w.Write([]byte(gauge.String()))
 	if err != nil {
 		panic(err)
 	}
 }
 
 func (o *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
-	var value string
-	var ok bool
-	if value, ok = o.ms.GetCounter(name); !ok {
+	params := models.Metrics{ID: name}
+	var counter *models.Counter
+	if counter = o.useCase.GetCounter(ctx, params); counter == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	_, err := w.Write([]byte(value))
+	_, err := w.Write([]byte(counter.String()))
 	if err != nil {
 		panic(err)
 	}
 }
 
 func (o *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
-	value := chi.URLParam(r, "value")
-	if value, err := strconv.ParseFloat(value, 64); err == nil {
-		o.ms.UpdateGauge(name, storage.Gauge(value))
+	valueStr := chi.URLParam(r, "value")
+	if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
+		params := models.Metrics{ID: name, Value: &value}
+		_ = o.useCase.UpdateGauge(ctx, params)
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -106,12 +114,15 @@ func (o *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Reques
 }
 
 func (o *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	w.Header().Set("Content-Type", "text/plain")
 
 	name := chi.URLParam(r, "name")
-	value := chi.URLParam(r, "value")
-	if value, err := strconv.ParseInt(value, 10, 64); err == nil {
-		o.ms.UpdateCounter(name, storage.Counter(value))
+	valueStr := chi.URLParam(r, "value")
+	if value, err := strconv.ParseInt(valueStr, 10, 64); err == nil {
+		params := models.Metrics{ID: name, Delta: &value}
+		o.useCase.UpdateCounter(ctx, params)
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -119,37 +130,41 @@ func (o *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *http.Requ
 }
 
 func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	w.Header().Set("Content-Type", "application/json")
 
-	var metrics models.Metrics
+	var metric models.Metrics
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	err := decoder.Decode(&metrics)
+	err := decoder.Decode(&metric)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	metricName := metrics.ID
+	metricName := metric.ID
 	if metricName == "" {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	metricType := metrics.MType
+	metricType := metric.MType
 	var resp models.Metrics
 	if metricType == "gauge" {
-		g := float64(o.ms.UpdateGauge(metricName, storage.Gauge(*metrics.Value)))
+		params := models.Metrics{ID: metricName, Value: metric.Value}
+		v := float64(*o.useCase.UpdateGauge(ctx, params))
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: "gauge",
-			Value: &g,
+			Value: &v,
 		}
 	} else if metricType == "counter" {
-		c := int64(o.ms.UpdateCounter(metricName, storage.Counter(*metrics.Delta)))
+		params := models.Metrics{ID: metricName, Delta: metric.Delta}
+		v := int64(*o.useCase.UpdateCounter(ctx, params))
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: "counter",
-			Delta: &c,
+			Delta: &v,
 		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -167,47 +182,51 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 }
 
 func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	w.Header().Set("Content-Type", "application/json")
 
-	var metrics models.Metrics
+	var metric models.Metrics
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	err := decoder.Decode(&metrics)
+	err := decoder.Decode(&metric)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	metricName := metrics.ID
+	metricName := metric.ID
 	if metricName == "" {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	metricType := metrics.MType
+	metricType := metric.MType
 	var resp models.Metrics
 	if metricType == "gauge" {
-		gStr, ok := o.ms.GetGauge(metricName)
-		if !ok {
+		params := models.Metrics{ID: metricName}
+		gauge := o.useCase.GetGauge(ctx, params)
+		if gauge == nil {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		g, _ := strconv.ParseFloat(gStr, 64)
+		v := float64(*gauge)
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: "gauge",
-			Value: &g,
+			Value: &v,
 		}
 	} else if metricType == "counter" {
-		cStr, ok := o.ms.GetCounter(metricName)
-		if !ok {
+		params := models.Metrics{ID: metricName}
+		counter := o.useCase.GetCounter(ctx, params)
+		if counter == nil {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		c, _ := strconv.ParseInt(cStr, 10, 64)
+		v := int64(*counter)
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: "counter",
-			Delta: &c,
+			Delta: &v,
 		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -225,7 +244,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *MetricsHandler) PingDB(w http.ResponseWriter, r *http.Request) {
-	err := o.db.Ping()
+	err := o.useCase.Ping()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

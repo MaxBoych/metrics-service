@@ -2,107 +2,52 @@ package main
 
 import (
 	"fmt"
-	"github.com/MaxBoych/MetricsService/internal/gzip"
-	"github.com/MaxBoych/MetricsService/internal/handlers"
-	"github.com/MaxBoych/MetricsService/internal/logger"
-	"github.com/MaxBoych/MetricsService/internal/storage"
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
-	"net/http"
-	"time"
+	"github.com/MaxBoych/MetricsService/config"
+	"github.com/MaxBoych/MetricsService/internal/metrics"
+	"github.com/MaxBoych/MetricsService/internal/metrics/delivery"
+	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
+	"github.com/MaxBoych/MetricsService/internal/server"
+	"github.com/MaxBoych/MetricsService/pkg/logger"
 )
 
 func main() {
-	ms, msHandler, db := initState()
-	defer db.CloseDB()
-	runServer(ms, msHandler, db)
+	setupLogger()
+	//defer db.Close()
+	setupServer()
 }
 
-func initState() (ms *storage.MemStorage, msHandler *handlers.MetricsHandler, db *storage.DBStorage) {
-	ms = storage.NewMemStorage()
-	db = storage.NewDBStorage()
-	msHandler = handlers.NewMetricsHandler(ms, db)
-
+func setupLogger() (ms *memory.MemStorage, msHandler *delivery.MetricsHandler) {
 	if err := logger.Initialize("INFO"); err != nil {
 		fmt.Printf("logger init error: %v\n", err)
 	}
-
 	return
 }
 
-func runServer(ms *storage.MemStorage, msHandler *handlers.MetricsHandler, db *storage.DBStorage) {
-	router := chi.NewRouter()
-	router.Use(logger.MiddlewareLogger)
-	router.Use(gzip.MiddlewareGzip)
+func setupServer() {
+	// setup config
+	cfg := config.NewConfig()
+	cfg.ParseConfig()
 
-	router.Get("/", msHandler.GetAllMetrics)
-	router.Route("/value", func(r chi.Router) {
+	var repo metrics.Repository
 
-		r.Post("/", msHandler.GetMetricJSON)
-		r.Get("/gauge/{name}", msHandler.GetGaugeMetric)
-		r.Get("/counter/{name}", msHandler.GetCounterMetric)
+	// 3-rd priority
+	ms := cfg.ConfigureMS()
+	repo = ms
 
-		r.NotFound(handlers.BadRequest)
-	})
-
-	router.Route("/update", func(r chi.Router) {
-
-		r.Post("/", msHandler.UpdateMetricJSON)
-		r.Route("/gauge", func(r chi.Router) {
-			r.Post("/{name}/{value}", msHandler.UpdateGaugeMetric)
-			r.NotFound(handlers.NotFound)
-		})
-
-		r.Route("/counter", func(r chi.Router) {
-			r.Post("/{name}/{value}", msHandler.UpdateCounterMetric)
-			r.NotFound(handlers.NotFound)
-		})
-
-		r.NotFound(handlers.BadRequest)
-	})
-
-	router.Get("/ping", msHandler.PingDB)
-
-	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		handlers.BadRequest(w, r)
-	})
-
-	fs := storage.NewFileStorage(ms)
-	cfg := configure(fs, db)
-
-	logger.Log.Info("running server", zap.String("address", cfg.runAddr))
-	if err := http.ListenAndServe(cfg.runAddr, router); err != nil {
-		panic(err)
-	}
-}
-
-func configure(fs *storage.FileStorage, db *storage.DBStorage) (config Config) {
-	config = parseConfig()
-	fs.SetConfigValues(config.fileStoragePath, config.storeInterval == 0)
-
-	if config.restore {
-		err := fs.LoadFromFile()
-		if err != nil {
-			logger.Log.Error("ERROR load from file", zap.String("error", err.Error()))
-		}
-	}
-	if config.storeInterval > 0 {
-		go func() {
-			for {
-				time.Sleep(time.Duration(config.storeInterval) * time.Second)
-
-				err := fs.StoreToFile()
-				if err != nil {
-					logger.Log.Error("ERROR store to file", zap.String("error", err.Error()))
-				}
-			}
-		}()
+	// 2-nd priority
+	fs := cfg.ConfigureFS(ms)
+	if fs != nil {
+		repo = fs
 	}
 
-	logger.Log.Info("INFO config.databaseDSN != \"\"", zap.String("info", config.databaseDSN))
-	if config.databaseDSN != "" {
-		db.Connect(config.databaseDSN)
+	// 1-st priority
+	db := cfg.ConfigureDB()
+	if db != nil {
+		defer db.Close()
+		repo = db
 	}
 
-	return
+	// setup server
+	srv := server.NewServer(repo)
+	srv.Run(cfg.RunAddr)
 }

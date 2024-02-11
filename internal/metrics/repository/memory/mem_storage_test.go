@@ -1,4 +1,4 @@
-package storage
+package memory
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func TestMemStorage_UpdateGauge(t *testing.T) {
 
 			for name, wanted := range test.want.gauges {
 				value, ok := ms.Gauges[name]
-				assert.Truef(t, ok, "Name '%s' must exist in the storage", name)
+				assert.Truef(t, ok, "Name '%s' must exist in the repository", name)
 				assert.Equalf(t, wanted, value, "Value for '%s' must be '%v' but got '%v'", name, wanted, value)
 			}
 			assert.Equal(t, test.want.counters["PollCount"], ms.Counters["PollCount"], "The number of updated elements does not match the counter")
@@ -70,7 +70,7 @@ func TestMemStorage_UpdateCounter(t *testing.T) {
 
 			for name, wanted := range test.want.counters {
 				value, ok := ms.Counters[name]
-				assert.Truef(t, ok, "Name '%s' must exist in the storage", name)
+				assert.Truef(t, ok, "Name '%s' must exist in the repository", name)
 				assert.Equalf(t, wanted, value, "Value for '%s' must be '%v' but got '%v'", name, wanted, value)
 			}
 			assert.Equal(t, test.want.counters["PollCount"], ms.Counters["PollCount"], "The number of updated elements does not match the counter")
@@ -105,7 +105,7 @@ func TestMemStorage_GetGauge(t *testing.T) {
 
 			for name, wanted := range test.want.gauges {
 				value, ok := ms.GetGauge(name)
-				assert.Truef(t, ok, "Name '%s' must exist in the storage", name)
+				assert.Truef(t, ok, "Name '%s' must exist in the repository", name)
 				assert.Equalf(t, wanted, value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
 			}
 		})
@@ -139,7 +139,7 @@ func TestMemStorage_GetCounter(t *testing.T) {
 
 			for name, wanted := range test.want.counters {
 				value, ok := ms.GetCounter(name)
-				assert.Truef(t, ok, "Name '%s' must exist in the storage", name)
+				assert.Truef(t, ok, "Name '%s' must exist in the repository", name)
 				assert.Equalf(t, wanted, value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
 			}
 		})

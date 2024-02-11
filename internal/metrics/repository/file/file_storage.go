@@ -1,20 +1,21 @@
-package storage
+package file
 
 import (
 	"encoding/json"
-	"github.com/MaxBoych/MetricsService/internal/logger"
+	"github.com/MaxBoych/MetricsService/internal/repository/memory"
+	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"go.uber.org/zap"
 	"os"
 	"sync"
 )
 
 type FileStorage struct {
-	ms       *MemStorage
+	ms       *memory.MemStorage
 	Mu       sync.RWMutex
 	FilePath string
 }
 
-func NewFileStorage(ms *MemStorage) *FileStorage {
+func NewFileStorage(ms *memory.MemStorage) *FileStorage {
 	return &FileStorage{
 		ms: ms,
 	}
