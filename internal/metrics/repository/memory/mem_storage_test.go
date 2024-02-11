@@ -1,26 +1,27 @@
 package memory
 
 import (
+	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestMemStorage_UpdateGauge(t *testing.T) {
 	type want struct {
-		gauges   map[string]Gauge
-		counters map[string]Counter
+		gauges   map[string]models.Gauge
+		counters map[string]models.Counter
 	}
 	tests := []struct {
 		name   string
-		gauges map[string]Gauge
+		gauges map[string]models.Gauge
 		want   want
 	}{
 		{
 			name:   "UPDATE GAUGE pass test 1",
-			gauges: map[string]Gauge{"a": 123, "b": 456, "c": 789},
+			gauges: map[string]models.Gauge{"a": 123, "b": 456, "c": 789},
 			want: want{
-				gauges:   map[string]Gauge{"a": 123, "b": 456, "c": 789},
-				counters: map[string]Counter{"PollCount": 3},
+				gauges:   map[string]models.Gauge{"a": 123, "b": 456, "c": 789},
+				counters: map[string]models.Counter{"PollCount": 3},
 			},
 		},
 	}
@@ -44,18 +45,18 @@ func TestMemStorage_UpdateGauge(t *testing.T) {
 
 func TestMemStorage_UpdateCounter(t *testing.T) {
 	type want struct {
-		counters map[string]Counter
+		counters map[string]models.Counter
 	}
 	tests := []struct {
 		name     string
-		counters map[string]Counter
+		counters map[string]models.Counter
 		want     want
 	}{
 		{
 			name:     "UPDATE COUNTER pass test 1",
-			counters: map[string]Counter{"a": 123, "b": 456, "c": 789},
+			counters: map[string]models.Counter{"a": 123, "b": 456, "c": 789},
 			want: want{
-				counters: map[string]Counter{"a": 246, "b": 912, "c": 1578, "PollCount": 6},
+				counters: map[string]models.Counter{"a": 246, "b": 912, "c": 1578, "PollCount": 6},
 			},
 		},
 	}
@@ -84,12 +85,12 @@ func TestMemStorage_GetGauge(t *testing.T) {
 	}
 	tests := []struct {
 		name   string
-		gauges map[string]Gauge
+		gauges map[string]models.Gauge
 		want   want
 	}{
 		{
 			name:   "GET GAUGE pass test 1",
-			gauges: map[string]Gauge{"a": 123, "b": 456, "c": 789},
+			gauges: map[string]models.Gauge{"a": 123, "b": 456, "c": 789},
 			want: want{
 				gauges: map[string]string{"a": "123", "b": "456", "c": "789"},
 			},
@@ -104,8 +105,8 @@ func TestMemStorage_GetGauge(t *testing.T) {
 			}
 
 			for name, wanted := range test.want.gauges {
-				value, ok := ms.GetGauge(name)
-				assert.Truef(t, ok, "Name '%s' must exist in the repository", name)
+				value := ms.GetGauge(name)
+				assert.NotNilf(t, value, "Name '%s' must exist in the repository", name)
 				assert.Equalf(t, wanted, value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
 			}
 		})
@@ -118,12 +119,12 @@ func TestMemStorage_GetCounter(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		counters map[string]Counter
+		counters map[string]models.Counter
 		want     want
 	}{
 		{
 			name:     "GET COUNTER pass test 1",
-			counters: map[string]Counter{"a": 123, "b": 456, "c": 789},
+			counters: map[string]models.Counter{"a": 123, "b": 456, "c": 789},
 			want: want{
 				counters: map[string]string{"a": "123", "b": "456", "c": "789"},
 			},
@@ -138,8 +139,8 @@ func TestMemStorage_GetCounter(t *testing.T) {
 			}
 
 			for name, wanted := range test.want.counters {
-				value, ok := ms.GetCounter(name)
-				assert.Truef(t, ok, "Name '%s' must exist in the repository", name)
+				value := ms.GetCounter(name)
+				assert.NotNilf(t, value, "Name '%s' must exist in the repository", name)
 				assert.Equalf(t, wanted, value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
 			}
 		})

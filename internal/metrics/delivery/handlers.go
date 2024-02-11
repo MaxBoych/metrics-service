@@ -1,20 +1,17 @@
-package handlers
+package delivery
 
 import (
 	"context"
 	"encoding/json"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
-	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"strconv"
 )
 
 type MetricsHandler struct {
-	//repo metrics.Repository
 	useCase metrics.UseCase
-	//db      *postgres.PGStorage
 }
 
 func NotFound(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +241,9 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *MetricsHandler) PingDB(w http.ResponseWriter, r *http.Request) {
-	err := o.useCase.Ping()
+	ctx := context.Background()
+
+	err := o.useCase.Ping(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

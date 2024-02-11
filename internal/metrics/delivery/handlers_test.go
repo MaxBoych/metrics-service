@@ -1,4 +1,4 @@
-package handlers
+package delivery
 
 import (
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"

@@ -1,12 +1,14 @@
-package repository
+package metrics
 
-import "github.com/MaxBoych/MetricsService/internal/repository/memory"
+import (
+	"context"
+	"github.com/MaxBoych/MetricsService/internal/metrics/models"
+)
 
 type Repository interface {
-	UpdateGauge(name string, new memory.Gauge) memory.Gauge
-	UpdateCounter(name string, new memory.Counter) memory.Counter
-	Count()
-	GetGauge(name string) (string, bool)
-	GetCounter(name string) (string, bool)
-	GetAllMetrics() []string
+	UpdateGauge(ctx context.Context, name string, new models.Gauge) *models.Gauge
+	UpdateCounter(ctx context.Context, name string, new models.Counter) *models.Counter
+	GetGauge(ctx context.Context, name string) *models.Gauge
+	GetCounter(ctx context.Context, name string) *models.Counter
+	GetAllMetrics(ctx context.Context) *models.Data
 }

@@ -5,8 +5,8 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"github.com/MaxBoych/MetricsService/internal/models"
-	"github.com/MaxBoych/MetricsService/internal/storage"
+	"github.com/MaxBoych/MetricsService/internal/metrics/models"
+	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"log"
 	"math/rand"
 	"net/http"
@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	ms := storage.NewMemStorage()
+	ms := memory.NewMemStorage()
 	config := parseConfig()
 
 	var wg sync.WaitGroup
@@ -34,7 +34,7 @@ func main() {
 	wg.Wait()
 }
 
-func updateMetrics(ms *storage.MemStorage, config Config) {
+func updateMetrics(ms *memory.MemStorage, config Config) {
 	var stats runtime.MemStats
 
 	for {
@@ -43,46 +43,46 @@ func updateMetrics(ms *storage.MemStorage, config Config) {
 		runtime.ReadMemStats(&stats)
 
 		ms.Mu.Lock()
-		ms.Gauges["Alloc"] = storage.Gauge(stats.Alloc)
-		ms.Gauges["BuckHashSys"] = storage.Gauge(stats.BuckHashSys)
-		ms.Gauges["Frees"] = storage.Gauge(stats.Frees)
-		ms.Gauges["GCCPUFraction"] = storage.Gauge(stats.GCCPUFraction)
-		ms.Gauges["GCSys"] = storage.Gauge(stats.GCSys)
-		ms.Gauges["HeapAlloc"] = storage.Gauge(stats.HeapAlloc)
-		ms.Gauges["HeapIdle"] = storage.Gauge(stats.HeapIdle)
-		ms.Gauges["HeapInuse"] = storage.Gauge(stats.HeapInuse)
-		ms.Gauges["HeapObjects"] = storage.Gauge(stats.HeapObjects)
-		ms.Gauges["HeapReleased"] = storage.Gauge(stats.HeapReleased)
-		ms.Gauges["HeapSys"] = storage.Gauge(stats.HeapSys)
-		ms.Gauges["LastGC"] = storage.Gauge(stats.LastGC)
-		ms.Gauges["NextGC"] = storage.Gauge(stats.NextGC)
-		ms.Gauges["NumForcedGC"] = storage.Gauge(stats.NumForcedGC)
-		ms.Gauges["NumGC"] = storage.Gauge(stats.NumGC)
-		ms.Gauges["PauseTotalNs"] = storage.Gauge(stats.PauseTotalNs)
-		ms.Gauges["Mallocs"] = storage.Gauge(stats.Mallocs)
-		ms.Gauges["TotalAlloc"] = storage.Gauge(stats.TotalAlloc)
-		ms.Gauges["OtherSys"] = storage.Gauge(stats.OtherSys)
-		ms.Gauges["Sys"] = storage.Gauge(stats.Sys)
-		ms.Gauges["MCacheInuse"] = storage.Gauge(stats.MCacheInuse)
-		ms.Gauges["MCacheSys"] = storage.Gauge(stats.MCacheSys)
-		ms.Gauges["MSpanInuse"] = storage.Gauge(stats.MSpanInuse)
-		ms.Gauges["MSpanSys"] = storage.Gauge(stats.MSpanSys)
-		ms.Gauges["StackInuse"] = storage.Gauge(stats.StackInuse)
-		ms.Gauges["StackSys"] = storage.Gauge(stats.StackSys)
-		ms.Gauges["Lookups"] = storage.Gauge(stats.Lookups)
-		ms.Gauges["RandomValue"] = storage.Gauge(rand.Float64())
+		ms.Gauges["Alloc"] = models.Gauge(stats.Alloc)
+		ms.Gauges["BuckHashSys"] = models.Gauge(stats.BuckHashSys)
+		ms.Gauges["Frees"] = models.Gauge(stats.Frees)
+		ms.Gauges["GCCPUFraction"] = models.Gauge(stats.GCCPUFraction)
+		ms.Gauges["GCSys"] = models.Gauge(stats.GCSys)
+		ms.Gauges["HeapAlloc"] = models.Gauge(stats.HeapAlloc)
+		ms.Gauges["HeapIdle"] = models.Gauge(stats.HeapIdle)
+		ms.Gauges["HeapInuse"] = models.Gauge(stats.HeapInuse)
+		ms.Gauges["HeapObjects"] = models.Gauge(stats.HeapObjects)
+		ms.Gauges["HeapReleased"] = models.Gauge(stats.HeapReleased)
+		ms.Gauges["HeapSys"] = models.Gauge(stats.HeapSys)
+		ms.Gauges["LastGC"] = models.Gauge(stats.LastGC)
+		ms.Gauges["NextGC"] = models.Gauge(stats.NextGC)
+		ms.Gauges["NumForcedGC"] = models.Gauge(stats.NumForcedGC)
+		ms.Gauges["NumGC"] = models.Gauge(stats.NumGC)
+		ms.Gauges["PauseTotalNs"] = models.Gauge(stats.PauseTotalNs)
+		ms.Gauges["Mallocs"] = models.Gauge(stats.Mallocs)
+		ms.Gauges["TotalAlloc"] = models.Gauge(stats.TotalAlloc)
+		ms.Gauges["OtherSys"] = models.Gauge(stats.OtherSys)
+		ms.Gauges["Sys"] = models.Gauge(stats.Sys)
+		ms.Gauges["MCacheInuse"] = models.Gauge(stats.MCacheInuse)
+		ms.Gauges["MCacheSys"] = models.Gauge(stats.MCacheSys)
+		ms.Gauges["MSpanInuse"] = models.Gauge(stats.MSpanInuse)
+		ms.Gauges["MSpanSys"] = models.Gauge(stats.MSpanSys)
+		ms.Gauges["StackInuse"] = models.Gauge(stats.StackInuse)
+		ms.Gauges["StackSys"] = models.Gauge(stats.StackSys)
+		ms.Gauges["Lookups"] = models.Gauge(stats.Lookups)
+		ms.Gauges["RandomValue"] = models.Gauge(rand.Float64())
 		ms.Mu.Unlock()
 	}
 }
 
-func sendMetrics(ms *storage.MemStorage, config Config) {
+func sendMetrics(ms *memory.MemStorage, config Config) {
 	for {
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
-		var gaugesCopy map[string]storage.Gauge
+		var gaugesCopy map[string]models.Gauge
 
 		ms.Mu.RLock()
-		gaugesCopy = make(map[string]storage.Gauge, len(ms.Gauges))
+		gaugesCopy = make(map[string]models.Gauge, len(ms.Gauges))
 		for k, v := range ms.Gauges {
 			gaugesCopy[k] = v
 		}
@@ -103,14 +103,14 @@ func sendMetrics(ms *storage.MemStorage, config Config) {
 	}
 }
 
-func sendMetricsJSON(ms *storage.MemStorage, config Config) {
+func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 	for {
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
-		var gaugesCopy map[string]storage.Gauge
+		var gaugesCopy map[string]models.Gauge
 
 		ms.Mu.RLock()
-		gaugesCopy = make(map[string]storage.Gauge, len(ms.Gauges))
+		gaugesCopy = make(map[string]models.Gauge, len(ms.Gauges))
 		for k, v := range ms.Gauges {
 			gaugesCopy[k] = v
 		}

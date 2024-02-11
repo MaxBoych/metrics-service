@@ -1,8 +1,10 @@
 package file
 
 import (
+	"context"
 	"encoding/json"
-	"github.com/MaxBoych/MetricsService/internal/repository/memory"
+	"github.com/MaxBoych/MetricsService/internal/metrics/models"
+	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"go.uber.org/zap"
 	"os"
@@ -12,7 +14,8 @@ import (
 type FileStorage struct {
 	ms       *memory.MemStorage
 	Mu       sync.RWMutex
-	FilePath string
+	filePath string
+	autoSave bool
 }
 
 func NewFileStorage(ms *memory.MemStorage) *FileStorage {
@@ -22,18 +25,19 @@ func NewFileStorage(ms *memory.MemStorage) *FileStorage {
 }
 
 func (o *FileStorage) SetConfigValues(filePath string, autoSave bool) {
-	o.FilePath = filePath
+	o.filePath = filePath
+	o.autoSave = autoSave
 
-	if autoSave {
+	/*if autoSave {
 		o.ms.SetOnChange(o.saveOnChange)
-	}
+	}*/
 }
 
 func (o *FileStorage) LoadFromFile() error {
 	o.ms.Mu.Lock()
 	defer o.ms.Mu.Unlock()
 
-	data, err := os.ReadFile(o.FilePath)
+	data, err := os.ReadFile(o.filePath)
 	if err != nil {
 		return err
 	}
@@ -44,22 +48,47 @@ func (o *FileStorage) LoadFromFile() error {
 }
 
 func (o *FileStorage) saveOnChange() {
-	err := o.storeToFile()
+	err := o.StoreToFile()
 	if err != nil {
-		logger.Log.Info("ERROR store to file", zap.String("error", err.Error()))
+		logger.Log.Info("ERROR store to file: saveOnChange()", zap.String("error", err.Error()))
 	}
 }
 
 func (o *FileStorage) StoreToFile() error {
 	o.Mu.Lock()
 	defer o.Mu.Unlock()
-	return o.storeToFile()
-}
 
-func (o *FileStorage) storeToFile() error {
 	data, err := json.MarshalIndent(o.ms.Data, "", "   ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(o.FilePath, data, 0666)
+	return os.WriteFile(o.filePath, data, 0666)
+}
+
+func (o *FileStorage) UpdateGauge(ctx context.Context, name string, new models.Gauge) *models.Gauge {
+	value := o.ms.UpdateGauge(ctx, name, new)
+	if o.autoSave {
+		o.saveOnChange()
+	}
+	return value
+}
+
+func (o *FileStorage) UpdateCounter(ctx context.Context, name string, new models.Counter) *models.Counter {
+	value := o.ms.UpdateCounter(ctx, name, new)
+	if o.autoSave {
+		o.saveOnChange()
+	}
+	return value
+}
+
+func (o *FileStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
+	return o.ms.GetGauge(ctx, name)
+}
+
+func (o *FileStorage) GetCounter(ctx context.Context, name string) *models.Counter {
+	return o.ms.GetCounter(ctx, name)
+}
+
+func (o *FileStorage) GetAllMetrics(ctx context.Context) *models.Data {
+	return o.ms.GetAllMetrics(ctx)
 }
