@@ -9,7 +9,7 @@ type Gauge float64
 type Counter int64
 
 func (o *Gauge) String() string {
-	return fmt.Sprintf("%f", *o)
+	return fmt.Sprintf("%g", *o)
 }
 
 func (o *Counter) String() string {

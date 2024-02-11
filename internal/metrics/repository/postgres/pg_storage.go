@@ -43,7 +43,9 @@ func (o *PGStorage) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (o *PGStorage) CreateTables() error {
+func (o *PGStorage) Init() error {
+	ctx := context.Background()
+
 	createGaugesTableSQL := fmt.Sprintf(`
     CREATE TABLE IF NOT EXISTS "%s" (
         "%s" BIGSERIAL PRIMARY KEY,
@@ -83,6 +85,21 @@ func (o *PGStorage) CreateTables() error {
 	_, err = o.db.Exec(context.Background(), createCountersTableSQL)
 	if err != nil {
 		logger.Log.Error("Unable to create counters table", zap.String("err", err.Error()))
+		return err
+	}
+
+	query, args, err := squirrel.Insert(CountersTableName).
+		Columns(NameColumnName, ValueColumnName).
+		Values(PollCountCounterName, 0).
+		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
+		ToSql()
+	if err != nil {
+		logger.Log.Error("Cannot to build INSERT query", zap.String("err", err.Error()))
+		return err
+	}
+	_, err = o.db.Exec(ctx, query, args...)
+	if err != nil {
+		logger.Log.Error("Cannot to execute INSERT query", zap.String("err", err.Error()))
 		return err
 	}
 

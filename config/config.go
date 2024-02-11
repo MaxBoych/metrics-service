@@ -58,6 +58,12 @@ func (o *Config) ConfigureDB() *postgres.PGStorage {
 			logger.Log.Info("ERROR cannot connect to DB", zap.String("err", err.Error()))
 			return nil
 		}
+		err = db.Init()
+		if err != nil {
+			logger.Log.Info("ERROR cannot create tables in DB", zap.String("err", err.Error()))
+			return nil
+		}
+
 		return db
 	} else {
 		logger.Log.Info("database DSN is empty")
