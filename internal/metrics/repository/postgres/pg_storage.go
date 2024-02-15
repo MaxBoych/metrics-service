@@ -59,7 +59,7 @@ func (o *PGStorage) Init() error {
 	createGaugesTableSQL := fmt.Sprintf(`
     CREATE TABLE IF NOT EXISTS "%s" (
         "%s" BIGSERIAL PRIMARY KEY,
-        "%s" VARCHAR(255) NOT NULL,
+        "%s" VARCHAR(255) NOT NULL UNIQUE,
         "%s" DOUBLE PRECISION NOT NULL,
         "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -74,8 +74,8 @@ func (o *PGStorage) Init() error {
 	createCountersTableSQL := fmt.Sprintf(`
     CREATE TABLE IF NOT EXISTS "%s" (
         "%s" BIGSERIAL PRIMARY KEY,
-        "%s" VARCHAR(255) NOT NULL,
-        "%s" DOUBLE PRECISION NOT NULL,
+        "%s" VARCHAR(255) NOT NULL UNIQUE,
+        "%s" BIGINT NOT NULL,
         "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
