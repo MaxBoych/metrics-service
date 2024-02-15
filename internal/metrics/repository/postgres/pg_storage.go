@@ -55,7 +55,7 @@ func (o *PGStorage) Ping(ctx context.Context) error {
 
 func (o *PGStorage) Init() error {
 	ctx := context.Background()
-
+	logger.Log.Info("successfully pinged to database")
 	createGaugesTableSQL := fmt.Sprintf(`
     CREATE TABLE IF NOT EXISTS "%s" (
         "%s" BIGSERIAL PRIMARY KEY,
@@ -86,13 +86,26 @@ func (o *PGStorage) Init() error {
 		CreatedAtColumnName,
 		UpdatedAtColumnName)
 
-	_, err := o.db.Exec(context.Background(), createGaugesTableSQL)
+	tx, err := o.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		logger.Log.Error("Cannot start transaction", zap.String("err", err.Error()))
+		return nil
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
+		}
+	}()
+
+	_, err = tx.Exec(context.Background(), createGaugesTableSQL)
 	if err != nil {
 		logger.Log.Error("Unable to create gauges table", zap.String("err", err.Error()))
 		return err
 	}
 
-	_, err = o.db.Exec(context.Background(), createCountersTableSQL)
+	_, err = tx.Exec(context.Background(), createCountersTableSQL)
 	if err != nil {
 		logger.Log.Error("Unable to create counters table", zap.String("err", err.Error()))
 		return err
@@ -102,16 +115,21 @@ func (o *PGStorage) Init() error {
 		Columns(NameColumnName, ValueColumnName).
 		Values(PollCountCounterName, 0).
 		PlaceholderFormat(squirrel.Dollar).
-		//Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
+		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
 		ToSql()
 	if err != nil {
 		logger.Log.Error("Cannot to build INSERT query", zap.String("err", err.Error()))
 		return err
 	}
-	_, err = o.db.Exec(ctx, query, args...)
+	_, err = tx.Exec(ctx, query, args...)
 	if err != nil {
 		logger.Log.Error("Cannot to execute INSERT query", zap.String("err", err.Error()))
 		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		logger.Log.Error("Cannot commit transaction", zap.String("err", err.Error()))
+		return nil
 	}
 
 	logger.Log.Info("Tables created successfully")
@@ -137,6 +155,13 @@ func (o *PGStorage) UpdateGauge(ctx context.Context, name string, new models.Gau
 		logger.Log.Error("Cannot start transaction", zap.String("err", err.Error()))
 		return nil
 	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
+		}
+	}()
 
 	query, args, err := squirrel.Insert(GaugesTableName).
 		Columns(insertMetric...).
@@ -166,7 +191,6 @@ func (o *PGStorage) UpdateGauge(ctx context.Context, name string, new models.Gau
 	//o.count(ctx)
 
 	if err = o.count(ctx, tx); err != nil {
-		tx.Rollback(ctx)
 		return nil
 	}
 
@@ -240,6 +264,13 @@ func (o *PGStorage) UpdateCounter(ctx context.Context, name string, new models.C
 		return nil
 	}
 
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
+		}
+	}()
+
 	query, args, err := squirrel.Insert(CountersTableName).
 		Columns(insertMetric...).
 		Values(name, int64(new), time.Now(), time.Now()).
@@ -251,14 +282,12 @@ func (o *PGStorage) UpdateCounter(ctx context.Context, name string, new models.C
 		ToSql()
 	if err != nil {
 		logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
-		tx.Rollback(ctx)
 		return nil
 	}
 
 	_, err = tx.Exec(ctx, query, args...)
 	if err != nil {
 		logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
-		tx.Rollback(ctx)
 		return nil
 	}
 
@@ -270,7 +299,6 @@ func (o *PGStorage) UpdateCounter(ctx context.Context, name string, new models.C
 	//o.count(ctx)
 
 	if err = o.count(ctx, tx); err != nil {
-		tx.Rollback(ctx)
 		return nil
 	}
 
@@ -438,6 +466,13 @@ func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
 		return err
 	}
 
+	defer func() {
+		if err != nil {
+			tx.Rollback(ctx)
+			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
+		}
+	}()
+
 	for _, m := range ms {
 		var query string
 		var args []interface{}
@@ -463,13 +498,11 @@ func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
 				ToSql()
 		}
 		if err != nil {
-			tx.Rollback(ctx)
 			return err
 		}
 
 		_, err = tx.Exec(ctx, query, args...)
 		if err != nil {
-			tx.Rollback(ctx)
 			return err
 		}
 	}
