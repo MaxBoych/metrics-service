@@ -326,7 +326,7 @@ func (o *PGStorage) UpdateCounter(ctx context.Context, name string, new models.C
 		logger.Log.Error("Cannot to build sql INSERT query", zap.String("err", err.Error()))
 		return nil
 	}
-
+//
 	var value int64
 	err = o.db.QueryRow(ctx, query, args...).Scan(&value)
 	if err != nil {
