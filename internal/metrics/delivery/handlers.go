@@ -251,8 +251,10 @@ func (o *MetricsHandler) UpdateMany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var ms []models.Metrics
+	//body :=
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
+	//logger.Log.Info("/updates/ JSON Body", zap.String("body", r.Body))
 	err := decoder.Decode(&ms)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)

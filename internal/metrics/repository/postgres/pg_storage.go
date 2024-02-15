@@ -507,5 +507,10 @@ func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
 		}
 	}
 
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		logger.Log.Error("Cannot commit transaction", zap.String("err", err.Error()))
+		return err
+	}
+
+	return nil
 }
