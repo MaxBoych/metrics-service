@@ -16,6 +16,11 @@ func (o *Counter) String() string {
 	return fmt.Sprintf("%d", *o)
 }
 
+const (
+	GaugeMetricName   = "gauge"
+	CounterMetricName = "counter"
+)
+
 type Data struct {
 	Gauges   map[string]Gauge
 	Counters map[string]Counter

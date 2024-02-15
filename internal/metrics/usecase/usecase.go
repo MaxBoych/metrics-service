@@ -46,3 +46,7 @@ func (o *MetricsUseCase) Ping(ctx context.Context) error {
 	}
 	return errors.New("repo is not db")
 }
+
+func (o *MetricsUseCase) UpdateMany(ctx context.Context, ms []models.Metrics) error {
+	return o.repo.UpdateMany(ctx, ms)
+}

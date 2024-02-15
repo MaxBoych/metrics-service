@@ -29,6 +29,7 @@ func main() {
 		defer wg.Done()
 		sendMetrics(ms, config)
 		sendMetricsJSON(ms, config)
+		sendMany(ms, config)
 	}()
 
 	wg.Wait()
@@ -121,7 +122,7 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 			g := float64(value)
 			metrics := models.Metrics{
 				ID:    key,
-				MType: "gauge",
+				MType: models.GaugeMetricName,
 				Value: &g,
 			}
 			jsonBody, err := json.Marshal(metrics)
@@ -163,6 +164,73 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 			if err != nil {
 				log.Printf("Error closing response body: %v\n", err)
 			}
+		}
+	}
+}
+
+func sendMany(ms *memory.MemStorage, config Config) {
+	for {
+		time.Sleep(time.Duration(config.reportInterval) * time.Second)
+
+		var gaugesCopy map[string]models.Gauge
+
+		ms.Mu.RLock()
+		gaugesCopy = make(map[string]models.Gauge, len(ms.Gauges))
+		for k, v := range ms.Gauges {
+			gaugesCopy[k] = v
+		}
+		ms.Mu.RUnlock()
+
+		var mcs []models.Metrics
+		for key, value := range gaugesCopy {
+
+			g := float64(value)
+			m := models.Metrics{
+				ID:    key,
+				MType: models.GaugeMetricName,
+				Value: &g,
+			}
+			mcs = append(mcs, m)
+		}
+
+		jsonBody, err := json.Marshal(mcs)
+		if err != nil {
+			panic(err)
+		}
+
+		var b bytes.Buffer
+		if config.useGzip {
+			gz := gzip.NewWriter(&b)
+			_, err = gz.Write(jsonBody)
+			if err != nil {
+				log.Printf("Error compressing JSON: %v\n", err)
+				continue
+			}
+			gz.Close()
+		} else {
+			b.Write(jsonBody)
+		}
+
+		url := fmt.Sprintf("http://%s/update/", config.runAddr)
+		request, err := http.NewRequest("POST", url, &b)
+		if err != nil {
+			log.Printf("Error creating request: %v\n", err)
+			continue
+		}
+
+		request.Header.Set("Content-Type", "application/json")
+		if config.useGzip {
+			request.Header.Set("Content-Encoding", "gzip")
+		}
+
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			log.Printf("Error sending POST request: %v\n", err)
+			continue
+		}
+		err = response.Body.Close()
+		if err != nil {
+			log.Printf("Error closing response body: %v\n", err)
 		}
 	}
 }

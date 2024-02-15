@@ -38,6 +38,7 @@ func SetupRoutes(router *chi.Mux, msHandler *MetricsHandler) {
 	})
 
 	router.Get("/ping", msHandler.PingDB)
+	router.Post("/updates", msHandler.UpdateMany)
 
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		BadRequest(w, r)

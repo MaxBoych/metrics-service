@@ -11,4 +11,5 @@ type Repository interface {
 	GetGauge(ctx context.Context, name string) *models.Gauge
 	GetCounter(ctx context.Context, name string) *models.Counter
 	GetAllMetrics(ctx context.Context) *models.Data
+	UpdateMany(ctx context.Context, ms []models.Metrics) error
 }

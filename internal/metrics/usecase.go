@@ -12,4 +12,5 @@ type UseCase interface {
 	GetCounter(ctx context.Context, params models.Metrics) *models.Counter
 	GetAllMetrics(ctx context.Context) *models.Data
 	Ping(ctx context.Context) error
+	UpdateMany(ctx context.Context, ms []models.Metrics) error
 }

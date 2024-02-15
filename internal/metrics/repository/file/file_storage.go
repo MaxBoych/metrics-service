@@ -103,3 +103,14 @@ func (o *FileStorage) GetCounter(ctx context.Context, name string) *models.Count
 func (o *FileStorage) GetAllMetrics(ctx context.Context) *models.Data {
 	return o.ms.GetAllMetrics(ctx)
 }
+
+func (o *FileStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
+	for _, m := range ms {
+		if m.MType == models.GaugeMetricName {
+			_ = o.UpdateGauge(ctx, m.ID, models.Gauge(*m.Value))
+		} else if m.MType == models.CounterMetricName {
+			_ = o.UpdateCounter(ctx, m.ID, models.Counter(*m.Delta))
+		}
+	}
+	return nil
+}

@@ -1,7 +1,6 @@
 package delivery
 
 import (
-	"context"
 	"encoding/json"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
@@ -32,7 +31,7 @@ func NewMetricsHandler(useCase metrics.UseCase) (handler *MetricsHandler) {
 }
 
 func (o *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	if accept := r.Header.Get("Accept"); accept == "html/text" {
 		w.Header().Set("Content-Type", "text/html")
@@ -52,7 +51,7 @@ func (o *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	w.Header().Set("Content-Type", "text/plain")
 
@@ -71,7 +70,7 @@ func (o *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) 
 }
 
 func (o *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	w.Header().Set("Content-Type", "text/plain")
 
@@ -90,7 +89,7 @@ func (o *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request
 }
 
 func (o *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	w.Header().Set("Content-Type", "text/plain")
 
@@ -106,7 +105,7 @@ func (o *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Reques
 }
 
 func (o *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	w.Header().Set("Content-Type", "text/plain")
 
@@ -122,7 +121,7 @@ func (o *MetricsHandler) UpdateCounterMetric(w http.ResponseWriter, r *http.Requ
 }
 
 func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -143,20 +142,20 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 	}
 	metricType := metric.MType
 	var resp models.Metrics
-	if metricType == "gauge" {
+	if metricType == models.GaugeMetricName {
 		params := models.Metrics{ID: metricName, Value: metric.Value}
 		v := float64(*o.useCase.UpdateGauge(ctx, params))
 		resp = models.Metrics{
 			ID:    metricName,
-			MType: "gauge",
+			MType: models.GaugeMetricName,
 			Value: &v,
 		}
-	} else if metricType == "counter" {
+	} else if metricType == models.CounterMetricName {
 		params := models.Metrics{ID: metricName, Delta: metric.Delta}
 		v := int64(*o.useCase.UpdateCounter(ctx, params))
 		resp = models.Metrics{
 			ID:    metricName,
-			MType: "counter",
+			MType: models.CounterMetricName,
 			Delta: &v,
 		}
 	} else {
@@ -175,7 +174,7 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 }
 
 func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -196,7 +195,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	metricType := metric.MType
 	var resp models.Metrics
-	if metricType == "gauge" {
+	if metricType == models.GaugeMetricName {
 		params := models.Metrics{ID: metricName}
 		gauge := o.useCase.GetGauge(ctx, params)
 		if gauge == nil {
@@ -206,10 +205,10 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		v := float64(*gauge)
 		resp = models.Metrics{
 			ID:    metricName,
-			MType: "gauge",
+			MType: models.GaugeMetricName,
 			Value: &v,
 		}
-	} else if metricType == "counter" {
+	} else if metricType == models.CounterMetricName {
 		params := models.Metrics{ID: metricName}
 		counter := o.useCase.GetCounter(ctx, params)
 		if counter == nil {
@@ -219,7 +218,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		v := int64(*counter)
 		resp = models.Metrics{
 			ID:    metricName,
-			MType: "counter",
+			MType: models.CounterMetricName,
 			Delta: &v,
 		}
 	} else {
@@ -238,9 +237,29 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *MetricsHandler) PingDB(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	err := o.useCase.Ping(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (o *MetricsHandler) UpdateMany(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var ms []models.Metrics
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	err := decoder.Decode(&ms)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = o.useCase.UpdateMany(ctx, ms)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
