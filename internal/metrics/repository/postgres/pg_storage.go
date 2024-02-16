@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/Masterminds/squirrel"
@@ -273,10 +272,10 @@ func (o *PGStorage) UpdateCounter(ctx context.Context, name string, new models.C
 	query, args, err := squirrel.Insert(CountersTableName).
 		Columns(insertMetric...).
 		Values(name, int64(new), squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
+		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
 			NameColumnName,
-			ValueColumnName, ValueColumnName,
-			UpdatedAtColumnName, UpdatedAtColumnName)).
+			ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
+			UpdatedAtColumnName)).
 		PlaceholderFormat(squirrel.Dollar).
 		ToSql()
 	if err != nil {
@@ -361,7 +360,7 @@ func (o *PGStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
 		&metric.UpdatedAt,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Log.Error("There is no such row", zap.String("err", err.Error()))
 			return nil
 		}
@@ -399,7 +398,7 @@ func (o *PGStorage) GetCounter(ctx context.Context, name string) *models.Counter
 		&metric.UpdatedAt,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Log.Error("There is no such row", zap.String("err", err.Error()))
 			return nil
 		}
@@ -501,9 +500,9 @@ func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
 			query, args, err = squirrel.Insert(CountersTableName).
 				Columns(insertMetric...).
 				Values(m.ID, m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = NOW()",
+				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
 					NameColumnName,
-					ValueColumnName, ValueColumnName,
+					ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
 					UpdatedAtColumnName)).
 				PlaceholderFormat(squirrel.Dollar).
 				ToSql()
