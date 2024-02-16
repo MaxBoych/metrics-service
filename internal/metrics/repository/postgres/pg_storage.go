@@ -10,7 +10,6 @@ import (
 	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"github.com/jackc/pgx/v4"
 	"go.uber.org/zap"
-	"time"
 )
 
 type PGStorage struct {
@@ -112,8 +111,8 @@ func (o *PGStorage) Init() error {
 	}
 
 	query, args, err := squirrel.Insert(CountersTableName).
-		Columns(NameColumnName, ValueColumnName).
-		Values(PollCountCounterName, 0).
+		Columns(insertMetric...).
+		Values(PollCountCounterName, 0, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
 		PlaceholderFormat(squirrel.Dollar).
 		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
 		ToSql()
@@ -165,7 +164,7 @@ func (o *PGStorage) UpdateGauge(ctx context.Context, name string, new models.Gau
 
 	query, args, err := squirrel.Insert(GaugesTableName).
 		Columns(insertMetric...).
-		Values(name, float64(new), time.Now(), time.Now()).
+		Values(name, float64(new), squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
 		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
 			NameColumnName,
 			ValueColumnName, ValueColumnName,
@@ -273,7 +272,7 @@ func (o *PGStorage) UpdateCounter(ctx context.Context, name string, new models.C
 
 	query, args, err := squirrel.Insert(CountersTableName).
 		Columns(insertMetric...).
-		Values(name, int64(new), time.Now(), time.Now()).
+		Values(name, int64(new), squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
 		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
 			NameColumnName,
 			ValueColumnName, ValueColumnName,
@@ -478,22 +477,22 @@ func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
 		var args []interface{}
 		if m.MType == models.GaugeMetricName {
 			query, args, err = squirrel.Insert(GaugesTableName).
-				Columns(NameColumnName, ValueColumnName, CreatedAtColumnName).
-				Values(m.ID, m.Value, time.Now()).
-				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
+				Columns(insertMetric...).
+				Values(m.ID, m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = NOW()",
 					NameColumnName,
 					ValueColumnName, ValueColumnName,
-					UpdatedAtColumnName, time.Now())).
+					UpdatedAtColumnName)).
 				PlaceholderFormat(squirrel.Dollar).
 				ToSql()
 		} else if m.MType == models.CounterMetricName {
 			query, args, err = squirrel.Insert(CountersTableName).
-				Columns(NameColumnName, ValueColumnName, CreatedAtColumnName).
-				Values(m.ID, m.Delta, time.Now()).
-				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
+				Columns(insertMetric...).
+				Values(m.ID, m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = NOW()",
 					NameColumnName,
 					ValueColumnName, ValueColumnName,
-					UpdatedAtColumnName, time.Now())).
+					UpdatedAtColumnName)).
 				PlaceholderFormat(squirrel.Dollar).
 				ToSql()
 		}
