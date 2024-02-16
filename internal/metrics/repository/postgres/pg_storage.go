@@ -353,7 +353,13 @@ func (o *PGStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
 		ctx,
 		query,
 		args...,
-	).Scan(&metric)
+	).Scan(
+		&metric.ID,
+		&metric.Name,
+		&metric.Value,
+		&metric.CreatedAt,
+		&metric.UpdatedAt,
+	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			logger.Log.Error("There is no such row", zap.String("err", err.Error()))
@@ -385,7 +391,13 @@ func (o *PGStorage) GetCounter(ctx context.Context, name string) *models.Counter
 		ctx,
 		query,
 		args...,
-	).Scan(&metric)
+	).Scan(
+		&metric.ID,
+		&metric.Name,
+		&metric.Value,
+		&metric.CreatedAt,
+		&metric.UpdatedAt,
+	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			logger.Log.Error("There is no such row", zap.String("err", err.Error()))
