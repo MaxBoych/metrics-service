@@ -98,12 +98,12 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 
 		for key, value := range gaugesCopy {
 			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.runAddr, key, fmt.Sprint(value))
-			var response *http.Response
 			var err error
 
 			for _, interval := range retryIntervals {
+				var response *http.Response
 				response, err = http.Post(url, "text/plain", nil)
-				response.Body.Close()
+				defer response.Body.Close()
 
 				if err == nil {
 					break //успешный запрос
@@ -173,10 +173,10 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 				request.Header.Set("Content-Encoding", "gzip")
 			}
 
-			var response *http.Response
 			for _, interval := range retryIntervals {
-				response, err = http.DefaultClient.Do(request)
-				response.Body.Close()
+				var response *http.Response
+				response, err = http.Post(url, "text/plain", nil)
+				defer response.Body.Close()
 
 				if err == nil {
 					break //успешный запрос
@@ -250,10 +250,10 @@ func sendMany(ms *memory.MemStorage, config Config) {
 			request.Header.Set("Content-Encoding", "gzip")
 		}
 
-		var response *http.Response
 		for _, interval := range retryIntervals {
-			response, err = http.DefaultClient.Do(request)
-			response.Body.Close()
+			var response *http.Response
+			response, err = http.Post(url, "text/plain", nil)
+			defer response.Body.Close()
 
 			if err == nil {
 				break //успешный запрос
