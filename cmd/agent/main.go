@@ -98,13 +98,11 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 
 		for key, value := range gaugesCopy {
 			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.runAddr, key, fmt.Sprint(value))
+			var response *http.Response
 			var err error
 
 			for _, interval := range retryIntervals {
-				var response *http.Response
 				response, err = http.Post(url, "text/plain", nil)
-				defer response.Body.Close()
-
 				if err == nil {
 					break //успешный запрос
 				} else if !isConnectionRefused(err) {
@@ -117,6 +115,11 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 			if err != nil {
 				log.Printf("Error after final retry: %v\n", err)
 				continue
+			}
+
+			err = response.Body.Close()
+			if err != nil {
+				log.Printf("Error closing response body: %v\n", err)
 			}
 		}
 	}
@@ -173,11 +176,9 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 				request.Header.Set("Content-Encoding", "gzip")
 			}
 
+			var response *http.Response
 			for _, interval := range retryIntervals {
-				var response *http.Response
-				response, err = http.Post(url, "text/plain", nil)
-				defer response.Body.Close()
-
+				response, err = http.DefaultClient.Do(request)
 				if err == nil {
 					break //успешный запрос
 				} else if !isConnectionRefused(err) {
@@ -190,6 +191,11 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 			if err != nil {
 				log.Printf("Error after final retry: %v\n", err)
 				continue
+			}
+
+			err = response.Body.Close()
+			if err != nil {
+				log.Printf("Error closing response body: %v\n", err)
 			}
 		}
 	}
@@ -250,11 +256,9 @@ func sendMany(ms *memory.MemStorage, config Config) {
 			request.Header.Set("Content-Encoding", "gzip")
 		}
 
+		var response *http.Response
 		for _, interval := range retryIntervals {
-			var response *http.Response
-			response, err = http.Post(url, "text/plain", nil)
-			defer response.Body.Close()
-
+			response, err = http.DefaultClient.Do(request)
 			if err == nil {
 				break //успешный запрос
 			} else if !isConnectionRefused(err) {
@@ -267,6 +271,11 @@ func sendMany(ms *memory.MemStorage, config Config) {
 		if err != nil {
 			log.Printf("Error after final retry: %v\n", err)
 			continue
+		}
+
+		err = response.Body.Close()
+		if err != nil {
+			log.Printf("Error closing response body: %v\n", err)
 		}
 	}
 }
