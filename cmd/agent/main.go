@@ -103,6 +103,8 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 
 			for _, interval := range retryIntervals {
 				response, err = http.Post(url, "text/plain", nil)
+				response.Body.Close()
+
 				if err == nil {
 					break //успешный запрос
 				} else if !isConnectionRefused(err) {
@@ -110,11 +112,6 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 				}
 				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
 				time.Sleep(interval)
-			}
-
-			err = response.Body.Close()
-			if err != nil {
-				log.Printf("Error closing response body: %v\n", err)
 			}
 
 			if err != nil {
@@ -179,6 +176,8 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 			var response *http.Response
 			for _, interval := range retryIntervals {
 				response, err = http.DefaultClient.Do(request)
+				response.Body.Close()
+
 				if err == nil {
 					break //успешный запрос
 				} else if !isConnectionRefused(err) {
@@ -186,11 +185,6 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 				}
 				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
 				time.Sleep(interval)
-			}
-
-			err = response.Body.Close()
-			if err != nil {
-				log.Printf("Error closing response body: %v\n", err)
 			}
 
 			if err != nil {
@@ -259,6 +253,8 @@ func sendMany(ms *memory.MemStorage, config Config) {
 		var response *http.Response
 		for _, interval := range retryIntervals {
 			response, err = http.DefaultClient.Do(request)
+			response.Body.Close()
+
 			if err == nil {
 				break //успешный запрос
 			} else if !isConnectionRefused(err) {
@@ -266,11 +262,6 @@ func sendMany(ms *memory.MemStorage, config Config) {
 			}
 			log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
 			time.Sleep(interval)
-		}
-
-		err = response.Body.Close()
-		if err != nil {
-			log.Printf("Error closing response body: %v\n", err)
 		}
 
 		if err != nil {
