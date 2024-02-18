@@ -112,14 +112,14 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 				time.Sleep(interval)
 			}
 
-			if err != nil {
-				log.Printf("Error after final retry: %v\n", err)
-				continue
-			}
-
 			err = response.Body.Close()
 			if err != nil {
 				log.Printf("Error closing response body: %v\n", err)
+			}
+
+			if err != nil {
+				log.Printf("Error after final retry: %v\n", err)
+				continue
 			}
 		}
 	}
@@ -188,14 +188,14 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 				time.Sleep(interval)
 			}
 
-			if err != nil {
-				log.Printf("Error after final retry: %v\n", err)
-				continue
-			}
-
 			err = response.Body.Close()
 			if err != nil {
 				log.Printf("Error closing response body: %v\n", err)
+			}
+
+			if err != nil {
+				log.Printf("Error after final retry: %v\n", err)
+				continue
 			}
 		}
 	}
@@ -268,14 +268,14 @@ func sendMany(ms *memory.MemStorage, config Config) {
 			time.Sleep(interval)
 		}
 
-		if err != nil {
-			log.Printf("Error after final retry: %v\n", err)
-			continue
-		}
-
 		err = response.Body.Close()
 		if err != nil {
 			log.Printf("Error closing response body: %v\n", err)
+		}
+
+		if err != nil {
+			log.Printf("Error after final retry: %v\n", err)
+			continue
 		}
 	}
 }
