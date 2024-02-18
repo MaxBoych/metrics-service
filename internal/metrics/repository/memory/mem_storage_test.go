@@ -33,7 +33,9 @@ func TestMemStorage_UpdateGauge(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.gauges {
-				ms.UpdateGauge(ctx, name, value)
+				v := float64(value)
+				m := models.Metrics{ID: name, MType: models.GaugeMetricName, Value: &v}
+				ms.UpdateGauge(ctx, m)
 			}
 
 			for name, wanted := range test.want.gauges {
@@ -70,8 +72,10 @@ func TestMemStorage_UpdateCounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.counters {
-				ms.UpdateCounter(ctx, name, value)
-				ms.UpdateCounter(ctx, name, value)
+				v := int64(value)
+				m := models.Metrics{ID: name, MType: models.CounterMetricName, Delta: &v}
+				ms.UpdateCounter(ctx, m)
+				ms.UpdateCounter(ctx, m)
 			}
 
 			for name, wanted := range test.want.counters {
@@ -108,13 +112,15 @@ func TestMemStorage_GetGauge(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.gauges {
-				ms.UpdateGauge(ctx, name, value)
+				v := float64(value)
+				m := models.Metrics{ID: name, MType: models.GaugeMetricName, Value: &v}
+				ms.UpdateGauge(ctx, m)
 			}
 
 			for name, wanted := range test.want.gauges {
-				value := ms.GetGauge(ctx, name)
+				value, _ := ms.GetGauge(ctx, name)
 				assert.NotNilf(t, value, "Name '%s' must exist in the repository", name)
-				assert.Equalf(t, wanted, *value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value.String())
+				assert.Equalf(t, wanted, *value, "Value for '%s' must be '%v' but got '%s'", name, wanted, value.String())
 			}
 		})
 	}
@@ -144,13 +150,15 @@ func TestMemStorage_GetCounter(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ms := NewMemStorage()
 			for name, value := range test.counters {
-				ms.UpdateCounter(ctx, name, value)
+				v := int64(value)
+				m := models.Metrics{ID: name, MType: models.CounterMetricName, Delta: &v}
+				ms.UpdateCounter(ctx, m)
 			}
 
 			for name, wanted := range test.want.counters {
-				value := ms.GetCounter(ctx, name)
+				value, _ := ms.GetCounter(ctx, name)
 				assert.NotNilf(t, value, "Name '%s' must exist in the repository", name)
-				assert.Equalf(t, wanted, *value, "Value for '%s' must be '%s' but got '%s'", name, wanted, value)
+				assert.Equalf(t, wanted, *value, "Value for '%s' must be '%v' but got '%s'", name, wanted, value)
 			}
 		})
 	}
