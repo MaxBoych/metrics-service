@@ -39,7 +39,7 @@ func (o *MetricsHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 
-	resp, err := o.useCase.GetAll(ctx)
+	resp, _ := o.useCase.GetAll(ctx)
 	jsonResp, err := json.Marshal(resp)
 	if err != nil {
 		panic(err)
@@ -57,13 +57,13 @@ func (o *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) 
 
 	name := chi.URLParam(r, "name")
 	params := models.Metrics{ID: name}
-	gauge, err := o.useCase.GetGauge(ctx, params)
+	gauge, _ := o.useCase.GetGauge(ctx, params)
 	if gauge == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	_, err = w.Write([]byte(gauge.String()))
+	_, err := w.Write([]byte(gauge.String()))
 	if err != nil {
 		panic(err)
 	}
@@ -76,13 +76,13 @@ func (o *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request
 
 	name := chi.URLParam(r, "name")
 	params := models.Metrics{ID: name}
-	counter, err := o.useCase.GetCounter(ctx, params)
+	counter, _ := o.useCase.GetCounter(ctx, params)
 	if counter == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	_, err = w.Write([]byte(counter.String()))
+	_, err := w.Write([]byte(counter.String()))
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +97,7 @@ func (o *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Reques
 	valueStr := chi.URLParam(r, "value")
 	if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
 		params := models.Metrics{ID: name, Value: &value}
-		_, err = o.useCase.UpdateGauge(ctx, params)
+		_, _ = o.useCase.UpdateGauge(ctx, params)
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -144,7 +144,7 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 	var resp models.Metrics
 	if metricType == models.GaugeMetricName {
 		params := models.Metrics{ID: metricName, Value: metric.Value}
-		_, err = o.useCase.UpdateGauge(ctx, params)
+		_, _ = o.useCase.UpdateGauge(ctx, params)
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: models.GaugeMetricName,
@@ -152,7 +152,7 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 		}
 	} else if metricType == models.CounterMetricName {
 		params := models.Metrics{ID: metricName, Delta: metric.Delta}
-		_, err = o.useCase.UpdateCounter(ctx, params)
+		_, _ = o.useCase.UpdateCounter(ctx, params)
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: models.CounterMetricName,
