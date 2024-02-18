@@ -6,10 +6,11 @@ import (
 )
 
 type Repository interface {
-	UpdateGauge(ctx context.Context, name string, new models.Gauge) *models.Gauge
-	UpdateCounter(ctx context.Context, name string, new models.Counter) *models.Counter
-	GetGauge(ctx context.Context, name string) *models.Gauge
-	GetCounter(ctx context.Context, name string) *models.Counter
-	GetAllMetrics(ctx context.Context) *models.Data
-	UpdateMany(ctx context.Context, ms []models.Metrics) error
+	UpdateGauge(ctx context.Context, m models.Metrics) (*models.Metrics, error)
+	UpdateCounter(ctx context.Context, m models.Metrics) (*models.Metrics, error)
+	UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error)
+
+	GetGauge(ctx context.Context, name string) (*models.Gauge, error)
+	GetCounter(ctx context.Context, name string) (*models.Counter, error)
+	GetAll(ctx context.Context) (*models.Data, error)
 }

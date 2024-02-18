@@ -11,7 +11,7 @@ func SetupRoutes(router *chi.Mux, msHandler *MetricsHandler) {
 	router.Use(logger.MiddlewareLogger)
 	router.Use(gzip.MiddlewareGzip)
 
-	router.Get("/", msHandler.GetAllMetrics)
+	router.Get("/", msHandler.GetAll)
 	router.Route("/value", func(r chi.Router) {
 
 		r.Post("/", msHandler.GetMetricJSON)

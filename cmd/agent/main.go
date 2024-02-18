@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"runtime"
 	"sync"
@@ -76,6 +78,11 @@ func updateMetrics(ms *memory.MemStorage, config Config) {
 	}
 }
 
+func isConnectionRefused(err error) bool {
+	var opError *net.OpError
+	return errors.As(err, &opError)
+}
+
 func sendMetrics(ms *memory.MemStorage, config Config) {
 	for {
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
@@ -91,11 +98,25 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 
 		for key, value := range gaugesCopy {
 			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.runAddr, key, fmt.Sprint(value))
-			response, err := http.Post(url, "text/plain", nil)
+			var response *http.Response
+			var err error
+
+			for _, interval := range retryIntervals {
+				response, err = http.Post(url, "text/plain", nil)
+				if err == nil {
+					break //успешный запрос
+				} else if !isConnectionRefused(err) {
+					break // проблема не на стороне сервера
+				}
+				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
+				time.Sleep(interval)
+			}
+
 			if err != nil {
-				log.Printf("Error sending POST request: %v\n", err)
+				log.Printf("Error after final retry: %v\n", err)
 				continue
 			}
+
 			err = response.Body.Close()
 			if err != nil {
 				log.Printf("Error closing response body: %v\n", err)
@@ -155,11 +176,23 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 				request.Header.Set("Content-Encoding", "gzip")
 			}
 
-			response, err := http.DefaultClient.Do(request)
+			var response *http.Response
+			for _, interval := range retryIntervals {
+				response, err = http.DefaultClient.Do(request)
+				if err == nil {
+					break //успешный запрос
+				} else if !isConnectionRefused(err) {
+					break // проблема не на стороне сервера
+				}
+				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
+				time.Sleep(interval)
+			}
+
 			if err != nil {
-				log.Printf("Error sending POST request: %v\n", err)
+				log.Printf("Error after final retry: %v\n", err)
 				continue
 			}
+
 			err = response.Body.Close()
 			if err != nil {
 				log.Printf("Error closing response body: %v\n", err)
@@ -223,11 +256,23 @@ func sendMany(ms *memory.MemStorage, config Config) {
 			request.Header.Set("Content-Encoding", "gzip")
 		}
 
-		response, err := http.DefaultClient.Do(request)
+		var response *http.Response
+		for _, interval := range retryIntervals {
+			response, err = http.DefaultClient.Do(request)
+			if err == nil {
+				break //успешный запрос
+			} else if !isConnectionRefused(err) {
+				break // проблема не на стороне сервера
+			}
+			log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
+			time.Sleep(interval)
+		}
+
 		if err != nil {
-			log.Printf("Error sending POST request: %v\n", err)
+			log.Printf("Error after final retry: %v\n", err)
 			continue
 		}
+
 		err = response.Body.Close()
 		if err != nil {
 			log.Printf("Error closing response body: %v\n", err)

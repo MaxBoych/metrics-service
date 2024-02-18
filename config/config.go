@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/file"
@@ -66,7 +67,7 @@ func (o *Config) ConfigureDB() *postgres.PGStorage {
 		} else {
 			logger.Log.Info("CONNECT to db is fine")
 		}
-		err = db.Init()
+		err = db.Init(context.Background())
 		if err != nil {
 			logger.Log.Info("ERROR cannot create tables in DB", zap.String("err", err.Error()))
 			return nil

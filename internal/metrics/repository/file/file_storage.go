@@ -34,6 +34,9 @@ func (o *FileStorage) CreateFileIfNotExists() error {
 	defer o.Mu.Unlock()
 
 	_, err := os.Stat(o.filePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	if os.IsNotExist(err) {
 		file, err := os.Create(o.filePath)
 		if err != nil {
@@ -76,41 +79,41 @@ func (o *FileStorage) StoreToFile() error {
 	return os.WriteFile(o.filePath, data, 0666)
 }
 
-func (o *FileStorage) UpdateGauge(ctx context.Context, name string, new models.Gauge) *models.Gauge {
-	value := o.ms.UpdateGauge(ctx, name, new)
+func (o *FileStorage) UpdateGauge(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
+	_, err := o.ms.UpdateGauge(ctx, m)
 	if o.autoSave {
 		o.saveOnChange()
 	}
-	return value
+	return &m, err
 }
 
-func (o *FileStorage) UpdateCounter(ctx context.Context, name string, new models.Counter) *models.Counter {
-	value := o.ms.UpdateCounter(ctx, name, new)
+func (o *FileStorage) UpdateCounter(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
+	_, err := o.ms.UpdateCounter(ctx, m)
 	if o.autoSave {
 		o.saveOnChange()
 	}
-	return value
+	return &m, err
 }
 
-func (o *FileStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
+func (o *FileStorage) GetGauge(ctx context.Context, name string) (*models.Gauge, error) {
 	return o.ms.GetGauge(ctx, name)
 }
 
-func (o *FileStorage) GetCounter(ctx context.Context, name string) *models.Counter {
+func (o *FileStorage) GetCounter(ctx context.Context, name string) (*models.Counter, error) {
 	return o.ms.GetCounter(ctx, name)
 }
 
-func (o *FileStorage) GetAllMetrics(ctx context.Context) *models.Data {
-	return o.ms.GetAllMetrics(ctx)
+func (o *FileStorage) GetAll(ctx context.Context) (*models.Data, error) {
+	return o.ms.GetAll(ctx)
 }
 
-func (o *FileStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
+func (o *FileStorage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
 	for _, m := range ms {
 		if m.MType == models.GaugeMetricName {
-			_ = o.UpdateGauge(ctx, m.ID, models.Gauge(*m.Value))
+			_, _ = o.UpdateGauge(ctx, m)
 		} else if m.MType == models.CounterMetricName {
-			_ = o.UpdateCounter(ctx, m.ID, models.Counter(*m.Delta))
+			_, _ = o.UpdateCounter(ctx, m)
 		}
 	}
-	return nil
+	return ms, nil
 }

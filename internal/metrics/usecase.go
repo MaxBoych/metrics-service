@@ -6,11 +6,13 @@ import (
 )
 
 type UseCase interface {
-	UpdateGauge(ctx context.Context, params models.Metrics) *models.Gauge
-	UpdateCounter(ctx context.Context, params models.Metrics) *models.Counter
-	GetGauge(ctx context.Context, params models.Metrics) *models.Gauge
-	GetCounter(ctx context.Context, params models.Metrics) *models.Counter
-	GetAllMetrics(ctx context.Context) *models.Data
+	UpdateGauge(ctx context.Context, params models.Metrics) (*models.Metrics, error)
+	UpdateCounter(ctx context.Context, params models.Metrics) (*models.Metrics, error)
+	UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error)
+
+	GetGauge(ctx context.Context, params models.Metrics) (*models.Gauge, error)
+	GetCounter(ctx context.Context, params models.Metrics) (*models.Counter, error)
+	GetAll(ctx context.Context) (*models.Data, error)
+
 	Ping(ctx context.Context) error
-	UpdateMany(ctx context.Context, ms []models.Metrics) error
 }

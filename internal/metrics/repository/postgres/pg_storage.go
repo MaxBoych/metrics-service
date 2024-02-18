@@ -7,8 +7,12 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
+	"github.com/MaxBoych/MetricsService/pkg/values"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"go.uber.org/zap"
+	"log"
+	"time"
 )
 
 type PGStorage struct {
@@ -20,118 +24,152 @@ func NewDBStorage() *PGStorage {
 }
 
 func (o *PGStorage) Connect(url string) error {
-	conn, err := pgx.Connect(context.Background(), url)
+	var err error
+	var conn *pgx.Conn
+
+	for _, interval := range values.RetryIntervals {
+		conn, err = pgx.Connect(context.Background(), url)
+		if err == nil {
+			logger.Log.Info("connecting to database", zap.String("address", url))
+			o.db = conn
+			break
+		}
+
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) {
+			logger.Log.Error("Unable to connect to database", zap.String("err", err.Error()))
+			return err // ошибка не на стороне базы данных
+		}
+
+		logger.Log.Error("Failed to ping the database", zap.String("err", err.Error()), zap.String("interval", interval.String()))
+		time.Sleep(interval)
+	}
+
 	if err != nil {
-		logger.Log.Error("Unable to connect to database", zap.String("err", err.Error()))
+		logger.Log.Error("Failed to connect the database after retries:", zap.String("err", err.Error()))
 		return err
 	}
-	logger.Log.Info("connecting to database", zap.String("address", url))
-	o.db = conn
 
-	//
-	err = o.db.Ping(context.Background())
-	if err != nil {
-		logger.Log.Error("Cannot to ping database", zap.String("err", err.Error()))
+	if err = o.Ping(context.Background()); err != nil {
 		return err
-	} else {
-		logger.Log.Error("PING was fine")
 	}
-	//
-
 	return nil
 }
 
 func (o *PGStorage) Ping(ctx context.Context) error {
-	err := o.db.Ping(ctx)
+	var err error
+
+	for _, interval := range values.RetryIntervals {
+		err = o.db.Ping(ctx)
+		if err == nil {
+			logger.Log.Info("Successfully pinged the database")
+			return nil
+		}
+
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) {
+			return err // ошибка не на стороне базы данных
+		}
+
+		logger.Log.Error("Failed to ping the database",
+			zap.String("err", err.Error()),
+			zap.String("interval", interval.String()),
+		)
+		time.Sleep(interval)
+	}
+
+	log.Println("Failed to ping the database after retries:", err)
+	return err
+}
+
+func (o *PGStorage) executeTx(ctx context.Context, operation func(ctx context.Context, tx pgx.Tx) error) error {
+	tx, err := o.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		logger.Log.Error("Unable to ping database", zap.String("err", err.Error()))
 		return err
 	}
-	logger.Log.Info("successfully pinged to database")
+
+	err = operation(ctx, tx)
+	if err != nil {
+		if rbErr := tx.Rollback(ctx); rbErr != nil {
+			logger.Log.Error("Failed to rollback transaction",
+				zap.String("rollbackErr", rbErr.Error()),
+				zap.String("originalErr", err.Error()),
+			)
+		}
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (o *PGStorage) Init() error {
-	ctx := context.Background()
-	logger.Log.Info("successfully pinged to database")
-	createGaugesTableSQL := fmt.Sprintf(`
-    CREATE TABLE IF NOT EXISTS "%s" (
-        "%s" BIGSERIAL PRIMARY KEY,
-        "%s" VARCHAR(255) NOT NULL UNIQUE,
-        "%s" DOUBLE PRECISION NOT NULL,
-        "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    );`,
-		GaugesTableName,
-		IDColumnName,
-		NameColumnName,
-		ValueColumnName,
-		CreatedAtColumnName,
-		UpdatedAtColumnName)
+func (o *PGStorage) Init(ctx context.Context) error {
+	return o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
-	createCountersTableSQL := fmt.Sprintf(`
-    CREATE TABLE IF NOT EXISTS "%s" (
-        "%s" BIGSERIAL PRIMARY KEY,
-        "%s" VARCHAR(255) NOT NULL UNIQUE,
-        "%s" BIGINT NOT NULL,
-        "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        "%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    );`,
-		CountersTableName,
-		IDColumnName,
-		NameColumnName,
-		ValueColumnName,
-		CreatedAtColumnName,
-		UpdatedAtColumnName)
+		createGaugesTableSQL := fmt.Sprintf(`
+    	CREATE TABLE IF NOT EXISTS "%s" (
+        	"%s" BIGSERIAL PRIMARY KEY,
+        	"%s" VARCHAR(255) NOT NULL UNIQUE,
+        	"%s" DOUBLE PRECISION NOT NULL,
+        	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    	);`,
+			GaugesTableName,
+			IDColumnName,
+			NameColumnName,
+			ValueColumnName,
+			CreatedAtColumnName,
+			UpdatedAtColumnName)
 
-	tx, err := o.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		logger.Log.Error("Cannot start transaction", zap.String("err", err.Error()))
-		return nil
-	}
+		createCountersTableSQL := fmt.Sprintf(`
+    	CREATE TABLE IF NOT EXISTS "%s" (
+        	"%s" BIGSERIAL PRIMARY KEY,
+        	"%s" VARCHAR(255) NOT NULL UNIQUE,
+        	"%s" BIGINT NOT NULL,
+        	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    	);`,
+			CountersTableName,
+			IDColumnName,
+			NameColumnName,
+			ValueColumnName,
+			CreatedAtColumnName,
+			UpdatedAtColumnName)
 
-	defer func() {
+		_, err := tx.Exec(context.Background(), createGaugesTableSQL)
 		if err != nil {
-			tx.Rollback(ctx)
-			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
+			logger.Log.Error("Unable to create gauges table", zap.String("err", err.Error()))
+			return err
 		}
-	}()
 
-	_, err = tx.Exec(context.Background(), createGaugesTableSQL)
-	if err != nil {
-		logger.Log.Error("Unable to create gauges table", zap.String("err", err.Error()))
-		return err
-	}
+		_, err = tx.Exec(context.Background(), createCountersTableSQL)
+		if err != nil {
+			logger.Log.Error("Unable to create counters table", zap.String("err", err.Error()))
+			return err
+		}
 
-	_, err = tx.Exec(context.Background(), createCountersTableSQL)
-	if err != nil {
-		logger.Log.Error("Unable to create counters table", zap.String("err", err.Error()))
-		return err
-	}
+		query, args, err := squirrel.Insert(CountersTableName).
+			Columns(insertMetric...).
+			Values(PollCountCounterName, 0, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+			PlaceholderFormat(squirrel.Dollar).
+			Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
+			ToSql()
+		if err != nil {
+			logger.Log.Error("Cannot to build INSERT query", zap.String("err", err.Error()))
+			return err
+		}
+		_, err = tx.Exec(ctx, query, args...)
+		if err != nil {
+			logger.Log.Error("Cannot to execute INSERT query", zap.String("err", err.Error()))
+			return err
+		}
 
-	query, args, err := squirrel.Insert(CountersTableName).
-		Columns(insertMetric...).
-		Values(PollCountCounterName, 0, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-		PlaceholderFormat(squirrel.Dollar).
-		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
-		ToSql()
-	if err != nil {
-		logger.Log.Error("Cannot to build INSERT query", zap.String("err", err.Error()))
-		return err
-	}
-	_, err = tx.Exec(ctx, query, args...)
-	if err != nil {
-		logger.Log.Error("Cannot to execute INSERT query", zap.String("err", err.Error()))
-		return err
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		logger.Log.Error("Cannot commit transaction", zap.String("err", err.Error()))
+		logger.Log.Info("Tables created successfully")
 		return nil
-	}
-
-	logger.Log.Info("Tables created successfully")
-	return nil
+	})
 }
 
 func (o *PGStorage) Close() {
@@ -140,64 +178,37 @@ func (o *PGStorage) Close() {
 	}
 }
 
-func (o *PGStorage) UpdateGauge(ctx context.Context, name string, new models.Gauge) *models.Gauge {
-	/*query, args, err := squirrel.Update(GaugesTableName).
-	Set(ValueColumnName, float64(new)).
-	Set(UpdatedAtColumnName, time.Now()).
-	Where(squirrel.Eq{NameColumnName: name}).
-	PlaceholderFormat(squirrel.Dollar).
-	ToSql()*/
+func (o *PGStorage) UpdateGauge(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
+	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
-	tx, err := o.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		logger.Log.Error("Cannot start transaction", zap.String("err", err.Error()))
-		return nil
-	}
-
-	defer func() {
+		query, args, err := squirrel.Insert(GaugesTableName).
+			Columns(insertMetric...).
+			Values(m.ID, *m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+			Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
+				NameColumnName,
+				ValueColumnName, ValueColumnName,
+				UpdatedAtColumnName, UpdatedAtColumnName)).
+			PlaceholderFormat(squirrel.Dollar).
+			ToSql()
 		if err != nil {
-			tx.Rollback(ctx)
-			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
+			logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
+			return err
 		}
-	}()
 
-	query, args, err := squirrel.Insert(GaugesTableName).
-		Columns(insertMetric...).
-		Values(name, float64(new), squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
-			NameColumnName,
-			ValueColumnName, ValueColumnName,
-			UpdatedAtColumnName, UpdatedAtColumnName)).
-		PlaceholderFormat(squirrel.Dollar).
-		ToSql()
-	if err != nil {
-		logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
+		_, err = tx.Exec(ctx, query, args...)
+		if err != nil {
+			logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
+			return err
+		}
+
+		if err = o.count(ctx, tx); err != nil {
+			return err
+		}
+
 		return nil
-	}
+	})
 
-	_, err = tx.Exec(ctx, query, args...)
-	if err != nil {
-		logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
-		return nil
-	}
-
-	/*gauge := &new
-	rowsAffected := res.RowsAffected()
-	if rowsAffected == 0 {
-		gauge = o.insertGauge(ctx, name, new)
-	}*/
-	//o.count(ctx)
-
-	if err = o.count(ctx, tx); err != nil {
-		return nil
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		logger.Log.Error("Cannot commit transaction", zap.String("err", err.Error()))
-		return nil
-	}
-
-	return &new
+	return &m, err
 }
 
 func (o *PGStorage) count(ctx context.Context, tx pgx.Tx) error {
@@ -221,121 +232,40 @@ func (o *PGStorage) count(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-/*func (o *PGStorage) insertGauge(ctx context.Context, name string, new models.Gauge) *models.Gauge {
-	query, args, err := squirrel.Insert(GaugesTableName).
-		Columns(insertMetric...).
-		Values(
-			name,
-			float64(new),
-			time.Now(),
-			time.Now(),
-		).
-		Suffix("RETURNING " + ValueColumnName).
-		PlaceholderFormat(squirrel.Dollar).
-		ToSql()
-	if err != nil {
-		logger.Log.Error("Cannot to build sql INSERT query", zap.String("err", err.Error()))
-		return nil
-	}
+func (o *PGStorage) UpdateCounter(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
+	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
-	var value float64
-	err = o.db.QueryRow(ctx, query, args...).Scan(&value)
-	if err != nil {
-		logger.Log.Error("Cannot to execute sql INSERT query", zap.String("err", err.Error()))
-		return nil
-	}
-	gauge := models.Gauge(value)
-	return &gauge
-}*/
-
-func (o *PGStorage) UpdateCounter(ctx context.Context, name string, new models.Counter) *models.Counter {
-	/*query, args, err := squirrel.Update(CountersTableName).
-	Set(ValueColumnName, int64(new)).
-	Set(UpdatedAtColumnName, time.Now()).
-	Where(squirrel.Eq{NameColumnName: name}).
-	PlaceholderFormat(squirrel.Dollar).
-	ToSql()*/
-
-	tx, err := o.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		logger.Log.Error("Cannot start transaction", zap.String("err", err.Error()))
-		return nil
-	}
-
-	defer func() {
+		query, args, err := squirrel.Insert(CountersTableName).
+			Columns(insertMetric...).
+			Values(m.ID, *m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+			Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
+				NameColumnName,
+				ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
+				UpdatedAtColumnName)).
+			PlaceholderFormat(squirrel.Dollar).
+			ToSql()
 		if err != nil {
-			tx.Rollback(ctx)
-			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
+			logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
+			return err
 		}
-	}()
 
-	query, args, err := squirrel.Insert(CountersTableName).
-		Columns(insertMetric...).
-		Values(name, int64(new), squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-		Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
-			NameColumnName,
-			ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
-			UpdatedAtColumnName)).
-		PlaceholderFormat(squirrel.Dollar).
-		ToSql()
-	if err != nil {
-		logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
+		_, err = tx.Exec(ctx, query, args...)
+		if err != nil {
+			logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
+			return err
+		}
+
+		if err = o.count(ctx, tx); err != nil {
+			return err
+		}
+
 		return nil
-	}
+	})
 
-	_, err = tx.Exec(ctx, query, args...)
-	if err != nil {
-		logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
-		return nil
-	}
-
-	/*counter := &new
-	rowsAffected := res.RowsAffected()
-	if rowsAffected == 0 {
-		counter = o.insertCounter(ctx, name, new)
-	}*/
-	//o.count(ctx)
-
-	if err = o.count(ctx, tx); err != nil {
-		return nil
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		logger.Log.Error("Cannot commit transaction", zap.String("err", err.Error()))
-		return nil
-	}
-
-	return &new
+	return &m, err
 }
 
-/*func (o *PGStorage) insertCounter(ctx context.Context, name string, new models.Counter) *models.Counter {
-	query, args, err := squirrel.Insert(CountersTableName).
-		Columns(insertMetric...).
-		Values(
-			name,
-			int64(new),
-			time.Now(),
-			time.Now(),
-		).
-		Suffix("RETURNING " + ValueColumnName).
-		PlaceholderFormat(squirrel.Dollar).
-		ToSql()
-	if err != nil {
-		logger.Log.Error("Cannot to build sql INSERT query", zap.String("err", err.Error()))
-		return nil
-	}
-//
-	var value int64
-	err = o.db.QueryRow(ctx, query, args...).Scan(&value)
-	if err != nil {
-		logger.Log.Error("Cannot to execute sql INSERT query", zap.String("err", err.Error()))
-		return nil
-	}
-	counter := models.Counter(value)
-	return &counter
-}*/
-
-func (o *PGStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
+func (o *PGStorage) GetGauge(ctx context.Context, name string) (*models.Gauge, error) {
 	query, args, err := squirrel.Select(selectMetric...).
 		From(GaugesTableName).
 		Where(squirrel.Eq{NameColumnName: name}).
@@ -343,7 +273,7 @@ func (o *PGStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
 		ToSql()
 	if err != nil {
 		logger.Log.Error("Cannot to build sql SELECT query", zap.String("err", err.Error()))
-		return nil
+		return nil, err
 	}
 
 	metric := models.GaugeMetric{}
@@ -362,18 +292,18 @@ func (o *PGStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Log.Error("There is no such row", zap.String("err", err.Error()))
-			return nil
+			return nil, err
 		}
 
 		logger.Log.Error("Error while scanning, sql SELECT query", zap.String("err", err.Error()))
-		return nil
+		return nil, err
 	}
 
 	gauge := models.Gauge(metric.Value)
-	return &gauge
+	return &gauge, nil
 }
 
-func (o *PGStorage) GetCounter(ctx context.Context, name string) *models.Counter {
+func (o *PGStorage) GetCounter(ctx context.Context, name string) (*models.Counter, error) {
 	query, args, err := squirrel.Select(selectMetric...).
 		From(CountersTableName).
 		Where(squirrel.Eq{NameColumnName: name}).
@@ -381,7 +311,7 @@ func (o *PGStorage) GetCounter(ctx context.Context, name string) *models.Counter
 		ToSql()
 	if err != nil {
 		logger.Log.Error("Cannot to build sql SELECT query", zap.String("err", err.Error()))
-		return nil
+		return nil, err
 	}
 
 	metric := models.CounterMetric{}
@@ -400,127 +330,121 @@ func (o *PGStorage) GetCounter(ctx context.Context, name string) *models.Counter
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Log.Error("There is no such row", zap.String("err", err.Error()))
-			return nil
+			return nil, err
 		}
 
 		logger.Log.Error("Error while scanning, sql SELECT query", zap.String("err", err.Error()))
-		return nil
+		return nil, err
 	}
 
 	counter := models.Counter(metric.Value)
-	return &counter
+	return &counter, err
 }
 
-func (o *PGStorage) GetAllMetrics(ctx context.Context) *models.Data {
+func (o *PGStorage) GetAll(ctx context.Context) (*models.Data, error) {
 	data := &models.Data{
 		Gauges:   make(map[string]models.Gauge),
 		Counters: make(map[string]models.Counter),
 	}
 
-	psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
+	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
-	// gauges
-	gaugeQuery, _, err := psql.Select(NameColumnName, ValueColumnName).From(GaugesTableName).ToSql()
-	if err != nil {
-		logger.Log.Error("ERROR make sql builder, sql SELECT query", zap.String("err", err.Error()))
-		return nil
-	}
+		psql := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 
-	gaugeRows, err := o.db.Query(ctx, gaugeQuery)
-	if err != nil {
-		logger.Log.Error("ERROR execute sql SELECT query", zap.String("err", err.Error()))
-		return nil
-	}
-	defer gaugeRows.Close()
-
-	for gaugeRows.Next() {
-		var name string
-		var value float64
-		if err := gaugeRows.Scan(&name, &value); err != nil {
-			logger.Log.Error("ERROR scan gauge rows", zap.String("err", err.Error()))
-			return nil
+		// gauges
+		gaugeQuery, _, err := psql.Select(NameColumnName, ValueColumnName).From(GaugesTableName).ToSql()
+		if err != nil {
+			logger.Log.Error("ERROR make sql builder, sql SELECT query", zap.String("err", err.Error()))
+			return err
 		}
-		data.Gauges[name] = models.Gauge(value)
-	}
 
-	// counters
-	counterQuery, _, err := psql.Select(NameColumnName, ValueColumnName).From(CountersTableName).ToSql()
-	if err != nil {
-		logger.Log.Error("ERROR make sql builder, sql SELECT query", zap.String("err", err.Error()))
-		return nil
-	}
-
-	counterRows, err := o.db.Query(ctx, counterQuery)
-	if err != nil {
-		logger.Log.Error("ERROR execute sql SELECT query", zap.String("err", err.Error()))
-		return nil
-	}
-	defer counterRows.Close()
-
-	for counterRows.Next() {
-		var name string
-		var value int64
-		if err := counterRows.Scan(&name, &value); err != nil {
-			logger.Log.Error("ERROR scan counter rows", zap.String("err", err.Error()))
-			return nil
+		gaugeRows, err := tx.Query(ctx, gaugeQuery)
+		if err != nil {
+			logger.Log.Error("ERROR execute sql SELECT query", zap.String("err", err.Error()))
+			return err
 		}
-		data.Counters[name] = models.Counter(value)
-	}
+		defer gaugeRows.Close()
 
-	return data
+		for gaugeRows.Next() {
+			var name string
+			var value float64
+			if err := gaugeRows.Scan(&name, &value); err != nil {
+				logger.Log.Error("ERROR scan gauge rows", zap.String("err", err.Error()))
+				return err
+			}
+			data.Gauges[name] = models.Gauge(value)
+		}
+
+		// counters
+		counterQuery, _, err := psql.Select(NameColumnName, ValueColumnName).From(CountersTableName).ToSql()
+		if err != nil {
+			logger.Log.Error("ERROR make sql builder, sql SELECT query", zap.String("err", err.Error()))
+			return err
+		}
+
+		counterRows, err := tx.Query(ctx, counterQuery)
+		if err != nil {
+			logger.Log.Error("ERROR execute sql SELECT query", zap.String("err", err.Error()))
+			return err
+		}
+		defer counterRows.Close()
+
+		for counterRows.Next() {
+			var name string
+			var value int64
+			if err := counterRows.Scan(&name, &value); err != nil {
+				logger.Log.Error("ERROR scan counter rows", zap.String("err", err.Error()))
+				return err
+			}
+			data.Counters[name] = models.Counter(value)
+		}
+
+		return nil
+	})
+
+	return data, err
 }
 
-func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
-	tx, err := o.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
+func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
+	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
-	defer func() {
-		if err != nil {
-			tx.Rollback(ctx)
-			logger.Log.Error("Rolling back transaction", zap.String("err", err.Error()))
-		}
-	}()
+		for _, m := range ms {
+			var query string
+			var args []interface{}
+			var err error
+			if m.MType == models.GaugeMetricName {
+				query, args, err = squirrel.Insert(GaugesTableName).
+					Columns(insertMetric...).
+					Values(m.ID, m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+					Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = NOW()",
+						NameColumnName,
+						ValueColumnName, ValueColumnName,
+						UpdatedAtColumnName)).
+					PlaceholderFormat(squirrel.Dollar).
+					ToSql()
+			} else if m.MType == models.CounterMetricName {
+				query, args, err = squirrel.Insert(CountersTableName).
+					Columns(insertMetric...).
+					Values(m.ID, m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+					Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
+						NameColumnName,
+						ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
+						UpdatedAtColumnName)).
+					PlaceholderFormat(squirrel.Dollar).
+					ToSql()
+			}
+			if err != nil {
+				return err
+			}
 
-	for _, m := range ms {
-		var query string
-		var args []interface{}
-		if m.MType == models.GaugeMetricName {
-			query, args, err = squirrel.Insert(GaugesTableName).
-				Columns(insertMetric...).
-				Values(m.ID, m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = NOW()",
-					NameColumnName,
-					ValueColumnName, ValueColumnName,
-					UpdatedAtColumnName)).
-				PlaceholderFormat(squirrel.Dollar).
-				ToSql()
-		} else if m.MType == models.CounterMetricName {
-			query, args, err = squirrel.Insert(CountersTableName).
-				Columns(insertMetric...).
-				Values(m.ID, m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-				Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
-					NameColumnName,
-					ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
-					UpdatedAtColumnName)).
-				PlaceholderFormat(squirrel.Dollar).
-				ToSql()
-		}
-		if err != nil {
-			return err
+			_, err = tx.Exec(ctx, query, args...)
+			if err != nil {
+				return err
+			}
 		}
 
-		_, err = tx.Exec(ctx, query, args...)
-		if err != nil {
-			return err
-		}
-	}
+		return nil
+	})
 
-	if err = tx.Commit(ctx); err != nil {
-		logger.Log.Error("Cannot commit transaction", zap.String("err", err.Error()))
-		return err
-	}
-
-	return nil
+	return ms, err
 }

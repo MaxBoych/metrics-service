@@ -30,7 +30,7 @@ func NewMetricsHandler(useCase metrics.UseCase) (handler *MetricsHandler) {
 	return
 }
 
-func (o *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+func (o *MetricsHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if accept := r.Header.Get("Accept"); accept == "html/text" {
@@ -39,7 +39,7 @@ func (o *MetricsHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 	}
 
-	resp := o.useCase.GetAllMetrics(ctx)
+	resp, err := o.useCase.GetAll(ctx)
 	jsonResp, err := json.Marshal(resp)
 	if err != nil {
 		panic(err)
@@ -57,13 +57,13 @@ func (o *MetricsHandler) GetGaugeMetric(w http.ResponseWriter, r *http.Request) 
 
 	name := chi.URLParam(r, "name")
 	params := models.Metrics{ID: name}
-	var gauge *models.Gauge
-	if gauge = o.useCase.GetGauge(ctx, params); gauge == nil {
+	gauge, err := o.useCase.GetGauge(ctx, params)
+	if gauge == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	_, err := w.Write([]byte(gauge.String()))
+	_, err = w.Write([]byte(gauge.String()))
 	if err != nil {
 		panic(err)
 	}
@@ -76,13 +76,13 @@ func (o *MetricsHandler) GetCounterMetric(w http.ResponseWriter, r *http.Request
 
 	name := chi.URLParam(r, "name")
 	params := models.Metrics{ID: name}
-	var counter *models.Counter
-	if counter = o.useCase.GetCounter(ctx, params); counter == nil {
+	counter, err := o.useCase.GetCounter(ctx, params)
+	if counter == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	_, err := w.Write([]byte(counter.String()))
+	_, err = w.Write([]byte(counter.String()))
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +97,7 @@ func (o *MetricsHandler) UpdateGaugeMetric(w http.ResponseWriter, r *http.Reques
 	valueStr := chi.URLParam(r, "value")
 	if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
 		params := models.Metrics{ID: name, Value: &value}
-		_ = o.useCase.UpdateGauge(ctx, params)
+		_, err = o.useCase.UpdateGauge(ctx, params)
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -144,19 +144,19 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 	var resp models.Metrics
 	if metricType == models.GaugeMetricName {
 		params := models.Metrics{ID: metricName, Value: metric.Value}
-		v := float64(*o.useCase.UpdateGauge(ctx, params))
+		_, err = o.useCase.UpdateGauge(ctx, params)
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: models.GaugeMetricName,
-			Value: &v,
+			Value: metric.Value,
 		}
 	} else if metricType == models.CounterMetricName {
 		params := models.Metrics{ID: metricName, Delta: metric.Delta}
-		v := int64(*o.useCase.UpdateCounter(ctx, params))
+		_, err = o.useCase.UpdateCounter(ctx, params)
 		resp = models.Metrics{
 			ID:    metricName,
 			MType: models.CounterMetricName,
-			Delta: &v,
+			Delta: metric.Delta,
 		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -197,7 +197,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var resp models.Metrics
 	if metricType == models.GaugeMetricName {
 		params := models.Metrics{ID: metricName}
-		gauge := o.useCase.GetGauge(ctx, params)
+		gauge, _ := o.useCase.GetGauge(ctx, params)
 		if gauge == nil {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -210,7 +210,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if metricType == models.CounterMetricName {
 		params := models.Metrics{ID: metricName}
-		counter := o.useCase.GetCounter(ctx, params)
+		counter, _ := o.useCase.GetCounter(ctx, params)
 		if counter == nil {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -251,17 +251,15 @@ func (o *MetricsHandler) UpdateMany(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var ms []models.Metrics
-	//body :=
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	//logger.Log.Info("/updates/ JSON Body", zap.String("body", r.Body))
 	err := decoder.Decode(&ms)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	err = o.useCase.UpdateMany(ctx, ms)
+	_, err = o.useCase.UpdateMany(ctx, ms)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

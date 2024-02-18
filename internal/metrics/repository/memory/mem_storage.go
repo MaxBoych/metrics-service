@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"sync"
 )
@@ -19,68 +20,66 @@ func NewMemStorage() (ms *MemStorage) {
 	return
 }
 
-func (o *MemStorage) GetAllMetrics(ctx context.Context) *models.Data {
+func (o *MemStorage) GetAll(_ context.Context) (*models.Data, error) {
 	o.Mu.RLock()
 	defer o.Mu.RUnlock()
 
-	return o.Data
+	return o.Data, nil
 }
 
-func (o *MemStorage) GetGauge(ctx context.Context, name string) *models.Gauge {
+func (o *MemStorage) GetGauge(_ context.Context, name string) (*models.Gauge, error) {
 	o.Mu.RLock()
 	defer o.Mu.RUnlock()
 
 	if value, ok := o.Data.Gauges[name]; ok {
-		return &value
+		return &value, nil
 	}
-	return nil
+	return nil, errors.New("no such gauge metric")
 }
 
-func (o *MemStorage) GetCounter(ctx context.Context, name string) *models.Counter {
+func (o *MemStorage) GetCounter(_ context.Context, name string) (*models.Counter, error) {
 	o.Mu.RLock()
 	defer o.Mu.RUnlock()
 
 	if value, ok := o.Data.Counters[name]; ok {
-		return &value
+		return &value, nil
 	}
-	return nil
+	return nil, errors.New("no such counter metric")
 }
 
-func (o *MemStorage) UpdateGauge(ctx context.Context, name string, new models.Gauge) *models.Gauge {
+func (o *MemStorage) UpdateGauge(_ context.Context, m models.Metrics) (*models.Metrics, error) {
 	o.Mu.Lock()
 	defer o.Mu.Unlock()
 
-	o.Data.Gauges[name] = new
+	o.Data.Gauges[m.ID] = models.Gauge(*m.Value)
 	o.count()
 
-	gauge := o.Gauges[name]
-	return &gauge
+	return &m, nil
 }
 
-func (o *MemStorage) UpdateCounter(ctx context.Context, name string, new models.Counter) *models.Counter {
+func (o *MemStorage) UpdateCounter(_ context.Context, m models.Metrics) (*models.Metrics, error) {
 	o.Mu.Lock()
 	defer o.Mu.Unlock()
 
-	o.Counters[name] += new
+	o.Counters[m.ID] += models.Counter(*m.Delta)
 	o.count()
 
-	counter := o.Counters[name]
-	return &counter
+	return &m, nil
 }
 
 func (o *MemStorage) count() {
 	o.Counters["PollCount"]++
 }
 
-func (o *MemStorage) UpdateMany(ctx context.Context, ms []models.Metrics) error {
+func (o *MemStorage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
 	for _, m := range ms {
 		if m.MType == models.GaugeMetricName {
-			_ = o.UpdateGauge(ctx, m.ID, models.Gauge(*m.Value))
+			_, _ = o.UpdateGauge(ctx, m)
 		} else if m.MType == models.CounterMetricName {
-			_ = o.UpdateCounter(ctx, m.ID, models.Counter(*m.Delta))
+			_, _ = o.UpdateCounter(ctx, m)
 		}
 	}
-	return nil
+	return ms, nil
 }
 
 func (o *MemStorage) init() {
