@@ -133,7 +133,7 @@ func executeWithRetries(
 			return nil, err // ошибка не на стороне storage
 		}
 
-		logger.Log.Error("Failed to ping the database",
+		logger.Log.Error("Failed to do operation",
 			zap.String("err", err.Error()),
 			zap.String("try again in", interval.String()),
 		)
