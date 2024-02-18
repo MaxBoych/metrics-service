@@ -277,7 +277,9 @@ func sendMany(ms *memory.MemStorage, config Config) {
 
 func doRequest(request *http.Request) error {
 	response, err := http.DefaultClient.Do(request)
-	defer response.Body.Close()
+	if response != nil {
+		defer response.Body.Close()
+	}
 
 	return err
 }
