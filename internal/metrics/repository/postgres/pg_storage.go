@@ -10,28 +10,34 @@ import (
 	"github.com/MaxBoych/MetricsService/pkg/values"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"go.uber.org/zap"
 	"log"
 	"time"
 )
 
 type PGStorage struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
 func NewDBStorage() *PGStorage {
 	return &PGStorage{}
 }
 
-func (o *PGStorage) Connect(url string) error {
+func (o *PGStorage) Connect(ctx context.Context, dsn string) error {
 	var err error
-	var conn *pgx.Conn
+	var pool *pgxpool.Pool
+
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return err
+	}
 
 	for _, interval := range values.RetryIntervals {
-		conn, err = pgx.Connect(context.Background(), url)
+		pool, err = pgxpool.ConnectConfig(ctx, cfg)
 		if err == nil {
-			logger.Log.Info("connecting to database", zap.String("address", url))
-			o.db = conn
+			logger.Log.Info("connecting to database", zap.String("address", dsn))
+			o.db = pool
 			break
 		}
 
@@ -50,7 +56,7 @@ func (o *PGStorage) Connect(url string) error {
 		return err
 	}
 
-	if err = o.Ping(context.Background()); err != nil {
+	if err = o.Ping(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -112,7 +118,7 @@ func (o *PGStorage) Init(ctx context.Context) error {
 		createGaugesTableSQL := fmt.Sprintf(`
     	CREATE TABLE IF NOT EXISTS "%s" (
         	"%s" BIGSERIAL PRIMARY KEY,
-        	"%s" VARCHAR(255) NOT NULL UNIQUE,
+        	"%s" TEXT NOT NULL UNIQUE,
         	"%s" DOUBLE PRECISION NOT NULL,
         	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -127,7 +133,7 @@ func (o *PGStorage) Init(ctx context.Context) error {
 		createCountersTableSQL := fmt.Sprintf(`
     	CREATE TABLE IF NOT EXISTS "%s" (
         	"%s" BIGSERIAL PRIMARY KEY,
-        	"%s" VARCHAR(255) NOT NULL UNIQUE,
+        	"%s" TEXT NOT NULL UNIQUE,
         	"%s" BIGINT NOT NULL,
         	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         	"%s" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -155,7 +161,7 @@ func (o *PGStorage) Init(ctx context.Context) error {
 			Columns(insertMetric...).
 			Values(PollCountCounterName, 0, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
 			PlaceholderFormat(squirrel.Dollar).
-			Suffix(fmt.Sprintf("ON CONFLICT (%s) DO NOTHING", NameColumnName)).
+			Suffix(fmt.Sprintf("ON CONFLICT (%[1]s) DO NOTHING", NameColumnName)).
 			ToSql()
 		if err != nil {
 			logger.Log.Error("Cannot to build INSERT query", zap.String("err", err.Error()))
@@ -174,43 +180,51 @@ func (o *PGStorage) Init(ctx context.Context) error {
 
 func (o *PGStorage) Close() {
 	if o.db != nil {
-		o.db.Close(context.Background())
+		o.db.Close()
 	}
 }
 
 func (o *PGStorage) UpdateGauge(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
 	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-
-		query, args, err := squirrel.Insert(GaugesTableName).
-			Columns(insertMetric...).
-			Values(m.ID, *m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-			Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s",
-				NameColumnName,
-				ValueColumnName, ValueColumnName,
-				UpdatedAtColumnName, UpdatedAtColumnName)).
-			PlaceholderFormat(squirrel.Dollar).
-			ToSql()
-		if err != nil {
-			logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
-			return err
-		}
-
-		_, err = tx.Exec(ctx, query, args...)
-		if err != nil {
-			logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
-			return err
-		}
-
-		if err = o.count(ctx, tx); err != nil {
-			return err
-		}
-
-		return nil
+		return o.updateGauge(ctx, tx, m)
 	})
 
 	return &m, err
 }
 
+func (o *PGStorage) updateGauge(ctx context.Context, tx pgx.Tx, m models.Metrics) error {
+	query, args, err := squirrel.Insert(GaugesTableName).
+		Columns(insertMetric...).
+		Values(m.ID, *m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+		Suffix(fmt.Sprintf("ON CONFLICT (%[1]s) DO UPDATE SET %[2]s = EXCLUDED.%[2]s, %[3]s = EXCLUDED.%[3]s",
+			NameColumnName,  // 1
+			ValueColumnName, // 2
+			UpdatedAtColumnName)). // 3
+		PlaceholderFormat(squirrel.Dollar).
+		ToSql()
+
+	if err != nil {
+		logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
+		return err
+	}
+
+	_, err = tx.Exec(ctx, query, args...)
+	if err != nil {
+		logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
+		return err
+	}
+
+	if err = o.count(ctx, tx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Ответ на вопрос из ревью.
+// Это каунтер-счетчик "PollCount". Каждый раз при изменении какой-либо метрики, происходит инкремент.
+// Задача на этот PollCount стояла еще в первом спринте для in-memory хранилища.
+// При переходе в PostreSQL мы по сути дублируем все методы на SQL-лад, поэтому и этот счетчик сюда также перекочевал.
 func (o *PGStorage) count(ctx context.Context, tx pgx.Tx) error {
 	incrementValue := 1
 	query, args, err := squirrel.Update(CountersTableName).
@@ -234,35 +248,39 @@ func (o *PGStorage) count(ctx context.Context, tx pgx.Tx) error {
 
 func (o *PGStorage) UpdateCounter(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
 	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
-
-		query, args, err := squirrel.Insert(CountersTableName).
-			Columns(insertMetric...).
-			Values(m.ID, *m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-			Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
-				NameColumnName,
-				ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
-				UpdatedAtColumnName)).
-			PlaceholderFormat(squirrel.Dollar).
-			ToSql()
-		if err != nil {
-			logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
-			return err
-		}
-
-		_, err = tx.Exec(ctx, query, args...)
-		if err != nil {
-			logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
-			return err
-		}
-
-		if err = o.count(ctx, tx); err != nil {
-			return err
-		}
-
-		return nil
+		return o.updateCounter(ctx, tx, m)
 	})
 
 	return &m, err
+}
+
+func (o *PGStorage) updateCounter(ctx context.Context, tx pgx.Tx, m models.Metrics) error {
+	query, args, err := squirrel.Insert(CountersTableName).
+		Columns(insertMetric...).
+		Values(m.ID, *m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
+		Suffix(fmt.Sprintf("ON CONFLICT (%[1]s) DO UPDATE SET %[2]s = %[3]s.%[2]s + EXCLUDED.%[2]s, %[4]s = NOW()",
+			NameColumnName,    // 1
+			ValueColumnName,   // 2
+			CountersTableName, // 3
+			UpdatedAtColumnName)). // 4
+		PlaceholderFormat(squirrel.Dollar).
+		ToSql()
+	if err != nil {
+		logger.Log.Error("Cannot to build sql UPSERT query", zap.String("err", err.Error()))
+		return err
+	}
+
+	_, err = tx.Exec(ctx, query, args...)
+	if err != nil {
+		logger.Log.Error("Cannot to execute sql UPSERT query", zap.String("err", err.Error()))
+		return err
+	}
+
+	if err = o.count(ctx, tx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (o *PGStorage) GetGauge(ctx context.Context, name string) (*models.Gauge, error) {
@@ -408,36 +426,13 @@ func (o *PGStorage) GetAll(ctx context.Context) (*models.Data, error) {
 func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
 	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
+		var err error
 		for _, m := range ms {
-			var query string
-			var args []interface{}
-			var err error
 			if m.MType == models.GaugeMetricName {
-				query, args, err = squirrel.Insert(GaugesTableName).
-					Columns(insertMetric...).
-					Values(m.ID, m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-					Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = NOW()",
-						NameColumnName,
-						ValueColumnName, ValueColumnName,
-						UpdatedAtColumnName)).
-					PlaceholderFormat(squirrel.Dollar).
-					ToSql()
+				err = o.updateGauge(ctx, tx, m)
 			} else if m.MType == models.CounterMetricName {
-				query, args, err = squirrel.Insert(CountersTableName).
-					Columns(insertMetric...).
-					Values(m.ID, m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
-					Suffix(fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET %s = %s.%s + EXCLUDED.%s, %s = NOW()",
-						NameColumnName,
-						ValueColumnName, CountersTableName, ValueColumnName, ValueColumnName,
-						UpdatedAtColumnName)).
-					PlaceholderFormat(squirrel.Dollar).
-					ToSql()
+				err = o.updateCounter(ctx, tx, m)
 			}
-			if err != nil {
-				return err
-			}
-
-			_, err = tx.Exec(ctx, query, args...)
 			if err != nil {
 				return err
 			}

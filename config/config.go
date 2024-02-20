@@ -60,7 +60,7 @@ func (o *Config) ConfigureDB() *postgres.PGStorage {
 	logger.Log.Info("INFO config.DatabaseDSN", zap.String("DatabaseDSN", o.DatabaseDSN))
 	db := postgres.NewDBStorage()
 	if o.DatabaseDSN != "" {
-		err := db.Connect(o.DatabaseDSN)
+		err := db.Connect(context.Background(), o.DatabaseDSN)
 		if err != nil {
 			logger.Log.Info("ERROR cannot connect to DB", zap.String("err", err.Error()))
 			return nil
