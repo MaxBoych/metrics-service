@@ -20,11 +20,12 @@ type Config struct {
 	Restore         bool
 	StoreInterval   int
 	DatabaseDSN     string
+	Key             string
 }
 
 func (o *Config) String() string {
-	return fmt.Sprintf("address: %s, filePath: %s, restore: %t, storeInterval: %d, database: %s",
-		o.RunAddr, o.FileStoragePath, o.Restore, o.StoreInterval, o.DatabaseDSN)
+	return fmt.Sprintf("address: %s, filePath: %s, restore: %t, storeInterval: %d, database: %s, key: %s",
+		o.RunAddr, o.FileStoragePath, o.Restore, o.StoreInterval, o.DatabaseDSN, o.Key)
 }
 
 func NewConfig() *Config {
@@ -37,6 +38,7 @@ func (o *Config) ParseConfig() {
 	flag.BoolVar(&o.Restore, "r", true, "whether to load metrics from a file when the server starts")
 	flag.IntVar(&o.StoreInterval, "i", 300, "time interval to store metrics on the disk")
 	flag.StringVar(&o.DatabaseDSN, "d", "", "database address to connect")
+	flag.StringVar(&o.Key, "k", "", "hash key")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -53,6 +55,9 @@ func (o *Config) ParseConfig() {
 	}
 	if envDatabaseDSN := os.Getenv("DATABASE_DSN"); envDatabaseDSN != "" {
 		o.DatabaseDSN = envDatabaseDSN
+	}
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		o.Key = envKey
 	}
 }
 

@@ -10,5 +10,5 @@ func (o *Server) MapHandlers(router *chi.Mux) {
 	useCase := usecase.NewMetricsUseCase(o.Repo)
 	msHandler := delivery.NewMetricsHandler(useCase)
 
-	delivery.SetupRoutes(router, msHandler)
+	delivery.SetupRoutes(router, msHandler, o.Cfg.Key)
 }

@@ -52,6 +52,6 @@ func setupServer() {
 	}
 
 	// setup server
-	srv := server.NewServer(repo)
+	srv := server.NewServer(repo, cfg)
 	srv.Run(cfg.RunAddr)
 }

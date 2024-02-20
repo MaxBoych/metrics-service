@@ -2,14 +2,18 @@ package delivery
 
 import (
 	"github.com/MaxBoych/MetricsService/pkg/gzip"
+	"github.com/MaxBoych/MetricsService/pkg/hash"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 )
 
-func SetupRoutes(router *chi.Mux, msHandler *MetricsHandler) {
+func SetupRoutes(router *chi.Mux, msHandler *MetricsHandler, hashKey string) {
 	router.Use(logger.MiddlewareLogger)
 	router.Use(gzip.MiddlewareGzip)
+	router.Use(func(next http.Handler) http.Handler {
+		return hash.MiddlewareHash(next, hashKey)
+	})
 
 	router.Get("/", msHandler.GetAll)
 	router.Route("/value", func(r chi.Router) {

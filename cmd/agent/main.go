@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
+	"github.com/MaxBoych/MetricsService/pkg/hash"
 	"github.com/MaxBoych/MetricsService/pkg/values"
 	"log"
 	"math/rand"
@@ -180,6 +181,10 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 			if config.useGzip {
 				request.Header.Set("Content-Encoding", "gzip")
 			}
+			if config.Key != "" {
+				hexHash := hash.Hash(string(jsonBody), config.Key)
+				request.Header.Set("HashSHA256", hexHash)
+			}
 
 			for _, interval := range values.RetryIntervals {
 				err = doRequest(request)
@@ -254,6 +259,10 @@ func sendMany(ms *memory.MemStorage, config Config) {
 		request.Header.Set("Content-Type", "application/json")
 		if config.useGzip {
 			request.Header.Set("Content-Encoding", "gzip")
+		}
+		if config.Key != "" {
+			hexHash := hash.Hash(string(jsonBody), config.Key)
+			request.Header.Set("HashSHA256", hexHash)
 		}
 
 		for _, interval := range values.RetryIntervals {

@@ -52,8 +52,8 @@ func (c *compressWriter) Header() http.Header {
 	return c.w.Header()
 }
 
-func (c *compressWriter) Write(p []byte) (int, error) {
-	return c.gw.Write(p)
+func (c *compressWriter) Write(b []byte) (int, error) {
+	return c.gw.Write(b)
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
@@ -81,8 +81,8 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
-func (c *compressReader) Read(p []byte) (n int, err error) {
-	return c.gr.Read(p)
+func (c *compressReader) Read(b []byte) (n int, err error) {
+	return c.gr.Read(b)
 }
 
 func (c *compressReader) Close() error {

@@ -197,8 +197,8 @@ func (o *PGStorage) updateGauge(ctx context.Context, tx pgx.Tx, m models.Metrics
 		Columns(insertMetric...).
 		Values(m.ID, *m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
 		Suffix(fmt.Sprintf("ON CONFLICT (%[1]s) DO UPDATE SET %[2]s = EXCLUDED.%[2]s, %[3]s = EXCLUDED.%[3]s",
-			NameColumnName,  // 1
-			ValueColumnName, // 2
+			NameColumnName,        // 1
+			ValueColumnName,       // 2
 			UpdatedAtColumnName)). // 3
 		PlaceholderFormat(squirrel.Dollar).
 		ToSql()
@@ -259,9 +259,9 @@ func (o *PGStorage) updateCounter(ctx context.Context, tx pgx.Tx, m models.Metri
 		Columns(insertMetric...).
 		Values(m.ID, *m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
 		Suffix(fmt.Sprintf("ON CONFLICT (%[1]s) DO UPDATE SET %[2]s = %[3]s.%[2]s + EXCLUDED.%[2]s, %[4]s = NOW()",
-			NameColumnName,    // 1
-			ValueColumnName,   // 2
-			CountersTableName, // 3
+			NameColumnName,        // 1
+			ValueColumnName,       // 2
+			CountersTableName,     // 3
 			UpdatedAtColumnName)). // 4
 		PlaceholderFormat(squirrel.Dollar).
 		ToSql()

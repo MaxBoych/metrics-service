@@ -11,6 +11,7 @@ type Config struct {
 	reportInterval int
 	pollInterval   int
 	useGzip        bool
+	Key            string
 }
 
 func parseConfig() (config Config) {
@@ -18,6 +19,7 @@ func parseConfig() (config Config) {
 	flag.IntVar(&config.reportInterval, "r", 10, "frequency of sending metrics on the server")
 	flag.IntVar(&config.pollInterval, "p", 2, "frequency of polling metrics from the 'runtime' package")
 	flag.BoolVar(&config.useGzip, "g", false, "whether to use gzip compression")
+	flag.StringVar(&config.Key, "k", "", "hash key")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -31,6 +33,9 @@ func parseConfig() (config Config) {
 	}
 	if envUseGzip, err := strconv.ParseBool(os.Getenv("POLL_INTERVAL")); err == nil {
 		config.useGzip = envUseGzip
+	}
+	if envKey := os.Getenv("KEY"); envKey != "" {
+		config.Key = envKey
 	}
 
 	return

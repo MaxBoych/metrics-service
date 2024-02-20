@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/MaxBoych/MetricsService/config"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"github.com/go-chi/chi/v5"
@@ -10,11 +11,13 @@ import (
 
 type Server struct {
 	Repo metrics.Repository
+	Cfg  *config.Config
 }
 
-func NewServer(repo metrics.Repository) *Server {
+func NewServer(repo metrics.Repository, cfg *config.Config) *Server {
 	return &Server{
 		Repo: repo,
+		Cfg:  cfg,
 	}
 }
 
