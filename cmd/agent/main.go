@@ -10,6 +10,8 @@ import (
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/MaxBoych/MetricsService/pkg/hash"
 	"github.com/MaxBoych/MetricsService/pkg/values"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	"log"
 	"math/rand"
 	"net"
@@ -23,20 +25,48 @@ func main() {
 	ms := memory.NewMemStorage()
 	config := parseConfig()
 
+	requests := make(chan *http.Request)
+	errs := make(chan error)
+
+	for w := 1; w <= config.rateLimit; w++ {
+		go worker(requests, errs)
+	}
+
+	go func() {
+		for err := range errs {
+			log.Printf("Error doing request: %v\n", err)
+		}
+	}()
+
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		updateMetrics(ms, config)
 	}()
 	go func() {
 		defer wg.Done()
-		sendMetrics(ms, config)
-		sendMetricsJSON(ms, config)
-		sendMany(ms, config)
+		updateGopsutilMetrics(ms, config)
+	}()
+	go func() {
+		defer wg.Done()
+		sendMetrics(ms, config, requests)
+		sendMetricsJSON(ms, config, requests)
+		sendMany(ms, config, requests)
 	}()
 
 	wg.Wait()
+
+	close(requests)
+	close(errs)
+}
+
+func worker(requests <-chan *http.Request, errs chan<- error) {
+	for r := range requests {
+		if err := doRequest(r); err != nil {
+			errs <- err
+		}
+	}
 }
 
 func updateMetrics(ms *memory.MemStorage, config Config) {
@@ -80,12 +110,25 @@ func updateMetrics(ms *memory.MemStorage, config Config) {
 	}
 }
 
+func updateGopsutilMetrics(ms *memory.MemStorage, config Config) {
+	for {
+		time.Sleep(time.Duration(config.pollInterval) * time.Second)
+
+		vm, _ := mem.VirtualMemory()
+		percent, _ := cpu.Percent(time.Second, false)
+
+		ms.Gauges["TotalMemory"] = models.Gauge(vm.Total)
+		ms.Gauges["FreeMemory"] = models.Gauge(vm.Free)
+		ms.Gauges["CPUutilization1"] = models.Gauge(percent[0])
+	}
+}
+
 func isConnectionRefused(err error) bool {
 	var opError *net.OpError
 	return errors.As(err, &opError)
 }
 
-func sendMetrics(ms *memory.MemStorage, config Config) {
+func sendMetrics(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
 	for {
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
@@ -112,14 +155,15 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 			request.Header.Set("Content-Type", "text/plain")
 
 			for _, interval := range values.RetryIntervals {
-				err = doRequest(request)
+				requests <- request
+				/*err = doRequest(request)
 				if err == nil {
 					break // успешный запрос
 				} else if !isConnectionRefused(err) {
 					break // проблема не на стороне сервера
 				}
 
-				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
+				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)*/
 				time.Sleep(interval)
 			}
 
@@ -131,7 +175,7 @@ func sendMetrics(ms *memory.MemStorage, config Config) {
 	}
 }
 
-func sendMetricsJSON(ms *memory.MemStorage, config Config) {
+func sendMetricsJSON(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
 	for {
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
@@ -187,14 +231,15 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 			}
 
 			for _, interval := range values.RetryIntervals {
-				err = doRequest(request)
+				requests <- request
+				/*err = doRequest(request)
 				if err == nil {
 					break // успешный запрос
 				} else if !isConnectionRefused(err) {
 					break // проблема не на стороне сервера
 				}
 
-				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
+				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)*/
 				time.Sleep(interval)
 			}
 
@@ -206,7 +251,7 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config) {
 	}
 }
 
-func sendMany(ms *memory.MemStorage, config Config) {
+func sendMany(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
 	for {
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
@@ -266,14 +311,15 @@ func sendMany(ms *memory.MemStorage, config Config) {
 		}
 
 		for _, interval := range values.RetryIntervals {
-			err = doRequest(request)
+			requests <- request
+			/*err = doRequest(request)
 			if err == nil {
 				break // успешный запрос
 			} else if !isConnectionRefused(err) {
 				break // проблема не на стороне сервера
 			}
 
-			log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)
+			log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)*/
 			time.Sleep(interval)
 		}
 

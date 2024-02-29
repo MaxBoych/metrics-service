@@ -12,6 +12,7 @@ type Config struct {
 	pollInterval   int
 	useGzip        bool
 	Key            string
+	rateLimit      int
 }
 
 func parseConfig() (config Config) {
@@ -20,6 +21,7 @@ func parseConfig() (config Config) {
 	flag.IntVar(&config.pollInterval, "p", 2, "frequency of polling metrics from the 'runtime' package")
 	flag.BoolVar(&config.useGzip, "g", false, "whether to use gzip compression")
 	flag.StringVar(&config.Key, "k", "", "hash key")
+	flag.IntVar(&config.rateLimit, "l", 1, "limit of simultaneous outgoing requests")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -36,6 +38,9 @@ func parseConfig() (config Config) {
 	}
 	if envKey := os.Getenv("KEY"); envKey != "" {
 		config.Key = envKey
+	}
+	if envRateLimit, err := strconv.Atoi(os.Getenv("RATE_LIMIT")); err == nil {
+		config.rateLimit = envRateLimit
 	}
 
 	return

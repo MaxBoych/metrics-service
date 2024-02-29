@@ -183,6 +183,12 @@ func (o *MemStorage) init() {
 
 			//Количество поисковых запросов к хеш-таблице, которые не сопровождались выделением памяти.
 			"Lookups": models.Gauge(0),
+
+			"TotalMemory": models.Gauge(0),
+
+			"FreeMemory": models.Gauge(0),
+
+			"CPUutilization1": models.Gauge(0),
 		},
 	}
 }
