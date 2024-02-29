@@ -167,10 +167,10 @@ func sendMetrics(ms *memory.MemStorage, config Config, requests chan<- *http.Req
 				time.Sleep(interval)
 			}
 
-			if err != nil {
+			/*if err != nil {
 				log.Printf("Error after final retry: %v\n", err)
 				continue
-			}
+			}*/
 		}
 	}
 }
@@ -243,10 +243,10 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config, requests chan<- *http
 				time.Sleep(interval)
 			}
 
-			if err != nil {
+			/*if err != nil {
 				log.Printf("Error after final retry: %v\n", err)
 				continue
-			}
+			}*/
 		}
 	}
 }
@@ -323,10 +323,10 @@ func sendMany(ms *memory.MemStorage, config Config, requests chan<- *http.Reques
 			time.Sleep(interval)
 		}
 
-		if err != nil {
+		/*if err != nil {
 			log.Printf("Error after final retry: %v\n", err)
 			continue
-		}
+		}*/
 	}
 }
 
