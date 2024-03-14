@@ -10,7 +10,6 @@ import (
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/MaxBoych/MetricsService/pkg/hash"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
-	//"github.com/MaxBoych/MetricsService/pkg/values"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 	"log"
@@ -72,7 +71,6 @@ func setupLogger() {
 	if err := logger.Initialize("INFO"); err != nil {
 		fmt.Printf("logger init error: %v\n", err)
 	}
-	return
 }
 
 func worker(requests <-chan *http.Request, errs chan<- error) {

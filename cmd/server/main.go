@@ -19,7 +19,6 @@ func setupLogger() {
 	if err := logger.Initialize("INFO"); err != nil {
 		fmt.Printf("logger init error: %v\n", err)
 	}
-	return
 }
 
 func setupServer() {
