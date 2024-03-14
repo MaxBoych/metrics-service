@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/MaxBoych/MetricsService/config"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
-	"github.com/MaxBoych/MetricsService/internal/metrics/delivery"
-	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/MaxBoych/MetricsService/internal/server"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"go.uber.org/zap"
@@ -17,7 +15,7 @@ func main() {
 	setupServer()
 }
 
-func setupLogger() (ms *memory.MemStorage, msHandler *delivery.MetricsHandler) {
+func setupLogger() {
 	if err := logger.Initialize("INFO"); err != nil {
 		fmt.Printf("logger init error: %v\n", err)
 	}

@@ -9,7 +9,8 @@ import (
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
 	"github.com/MaxBoych/MetricsService/pkg/hash"
-	"github.com/MaxBoych/MetricsService/pkg/values"
+	"github.com/MaxBoych/MetricsService/pkg/logger"
+	//"github.com/MaxBoych/MetricsService/pkg/values"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 	"log"
@@ -22,6 +23,7 @@ import (
 )
 
 func main() {
+	setupLogger()
 	ms := memory.NewMemStorage()
 	config := parseConfig()
 
@@ -39,7 +41,7 @@ func main() {
 	}()
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(5)
 	go func() {
 		defer wg.Done()
 		updateMetrics(ms, config)
@@ -51,18 +53,31 @@ func main() {
 	go func() {
 		defer wg.Done()
 		sendMetrics(ms, config, requests)
+	}()
+	go func() {
+		defer wg.Done()
 		sendMetricsJSON(ms, config, requests)
+	}()
+	go func() {
+		defer wg.Done()
 		sendMany(ms, config, requests)
 	}()
-
 	wg.Wait()
 
 	close(requests)
 	close(errs)
 }
 
+func setupLogger() {
+	if err := logger.Initialize("INFO"); err != nil {
+		fmt.Printf("logger init error: %v\n", err)
+	}
+	return
+}
+
 func worker(requests <-chan *http.Request, errs chan<- error) {
 	for r := range requests {
+		fmt.Println(r.RequestURI)
 		if err := doRequest(r); err != nil {
 			errs <- err
 		}
@@ -117,9 +132,11 @@ func updateGopsutilMetrics(ms *memory.MemStorage, config Config) {
 		vm, _ := mem.VirtualMemory()
 		percent, _ := cpu.Percent(time.Second, false)
 
+		ms.Mu.Lock()
 		ms.Gauges["TotalMemory"] = models.Gauge(vm.Total)
 		ms.Gauges["FreeMemory"] = models.Gauge(vm.Free)
 		ms.Gauges["CPUutilization1"] = models.Gauge(percent[0])
+		ms.Mu.Unlock()
 	}
 }
 
@@ -130,6 +147,7 @@ func isConnectionRefused(err error) bool {
 
 func sendMetrics(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
 	for {
+		//logger.Log.Info("New sending...")
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
 		var gaugesCopy map[string]models.Gauge
@@ -145,7 +163,6 @@ func sendMetrics(ms *memory.MemStorage, config Config, requests chan<- *http.Req
 			url := fmt.Sprintf("http://%s/update/gauge/%s/%s", config.runAddr, key, fmt.Sprint(value))
 			var err error
 			var b bytes.Buffer
-			//response, err = http.Post(url, "text/plain", nil)
 			request, err := http.NewRequest("POST", url, &b)
 			if err != nil {
 				log.Printf("Error creating request: %v\n", err)
@@ -154,29 +171,14 @@ func sendMetrics(ms *memory.MemStorage, config Config, requests chan<- *http.Req
 
 			request.Header.Set("Content-Type", "text/plain")
 
-			for _, interval := range values.RetryIntervals {
-				requests <- request
-				/*err = doRequest(request)
-				if err == nil {
-					break // успешный запрос
-				} else if !isConnectionRefused(err) {
-					break // проблема не на стороне сервера
-				}
-
-				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)*/
-				time.Sleep(interval)
-			}
-
-			/*if err != nil {
-				log.Printf("Error after final retry: %v\n", err)
-				continue
-			}*/
+			requests <- request
 		}
 	}
 }
 
 func sendMetricsJSON(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
 	for {
+		//logger.Log.Info("New sending JSON...")
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
 		var gaugesCopy map[string]models.Gauge
@@ -230,29 +232,14 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config, requests chan<- *http
 				request.Header.Set("HashSHA256", hexHash)
 			}
 
-			for _, interval := range values.RetryIntervals {
-				requests <- request
-				/*err = doRequest(request)
-				if err == nil {
-					break // успешный запрос
-				} else if !isConnectionRefused(err) {
-					break // проблема не на стороне сервера
-				}
-
-				log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)*/
-				time.Sleep(interval)
-			}
-
-			/*if err != nil {
-				log.Printf("Error after final retry: %v\n", err)
-				continue
-			}*/
+			requests <- request
 		}
 	}
 }
 
 func sendMany(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
 	for {
+		//logger.Log.Info("New sending MANY...")
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
 
 		var gaugesCopy map[string]models.Gauge
@@ -310,23 +297,7 @@ func sendMany(ms *memory.MemStorage, config Config, requests chan<- *http.Reques
 			request.Header.Set("HashSHA256", hexHash)
 		}
 
-		for _, interval := range values.RetryIntervals {
-			requests <- request
-			/*err = doRequest(request)
-			if err == nil {
-				break // успешный запрос
-			} else if !isConnectionRefused(err) {
-				break // проблема не на стороне сервера
-			}
-
-			log.Printf("Error sending POST request, retrying in %v: %v\n", interval, err)*/
-			time.Sleep(interval)
-		}
-
-		/*if err != nil {
-			log.Printf("Error after final retry: %v\n", err)
-			continue
-		}*/
+		requests <- request
 	}
 }
 
