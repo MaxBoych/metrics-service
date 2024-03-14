@@ -4,9 +4,10 @@ const (
 	GaugesTableName   = "gauges"
 	CountersTableName = "counters"
 
-	IDColumnName        = "id"
-	NameColumnName      = "name"
-	ValueColumnName     = "value"
+	IDColumnName    = "id"
+	NameColumnName  = "name"
+	ValueColumnName = "value"
+
 	CreatedAtColumnName = "created_at"
 	UpdatedAtColumnName = "updated_at"
 
