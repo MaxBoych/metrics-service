@@ -7,27 +7,27 @@ import (
 	"sync"
 )
 
-type MemStorage struct {
+type Storage struct {
 	*models.Data
 	Mu sync.RWMutex
 }
 
-func NewMemStorage() (ms *MemStorage) {
-	ms = &MemStorage{}
+func NewMemStorage() (ms *Storage) {
+	ms = &Storage{}
 	// Оставил функцию init, так как в ней содержится информация о метриках, что занимает слишком много места.
 	// Пусть лучше это будет отдельной вспомогательной функцией.
 	ms.init()
 	return
 }
 
-func (o *MemStorage) GetAll(_ context.Context) (*models.Data, error) {
+func (o *Storage) GetAll(_ context.Context) (*models.Data, error) {
 	o.Mu.RLock()
 	defer o.Mu.RUnlock()
 
 	return o.Data, nil
 }
 
-func (o *MemStorage) GetGauge(_ context.Context, name string) (*models.Gauge, error) {
+func (o *Storage) GetGauge(_ context.Context, name string) (*models.Gauge, error) {
 	o.Mu.RLock()
 	defer o.Mu.RUnlock()
 
@@ -37,7 +37,7 @@ func (o *MemStorage) GetGauge(_ context.Context, name string) (*models.Gauge, er
 	return nil, errors.New("no such gauge metric")
 }
 
-func (o *MemStorage) GetCounter(_ context.Context, name string) (*models.Counter, error) {
+func (o *Storage) GetCounter(_ context.Context, name string) (*models.Counter, error) {
 	o.Mu.RLock()
 	defer o.Mu.RUnlock()
 
@@ -47,7 +47,7 @@ func (o *MemStorage) GetCounter(_ context.Context, name string) (*models.Counter
 	return nil, errors.New("no such counter metric")
 }
 
-func (o *MemStorage) UpdateGauge(_ context.Context, m models.Metrics) (*models.Metrics, error) {
+func (o *Storage) UpdateGauge(_ context.Context, m models.Metrics) (*models.Metrics, error) {
 	o.Mu.Lock()
 	defer o.Mu.Unlock()
 
@@ -57,7 +57,7 @@ func (o *MemStorage) UpdateGauge(_ context.Context, m models.Metrics) (*models.M
 	return &m, nil
 }
 
-func (o *MemStorage) UpdateCounter(_ context.Context, m models.Metrics) (*models.Metrics, error) {
+func (o *Storage) UpdateCounter(_ context.Context, m models.Metrics) (*models.Metrics, error) {
 	o.Mu.Lock()
 	defer o.Mu.Unlock()
 
@@ -67,11 +67,11 @@ func (o *MemStorage) UpdateCounter(_ context.Context, m models.Metrics) (*models
 	return &m, nil
 }
 
-func (o *MemStorage) count() {
+func (o *Storage) count() {
 	o.Counters["PollCount"]++
 }
 
-func (o *MemStorage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
+func (o *Storage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
 	for _, m := range ms {
 		if m.MType == models.GaugeMetricName {
 			_, _ = o.UpdateGauge(ctx, m)
@@ -82,7 +82,7 @@ func (o *MemStorage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]mod
 	return ms, nil
 }
 
-func (o *MemStorage) init() {
+func (o *Storage) init() {
 	o.Mu.Lock()
 	defer o.Mu.Unlock()
 

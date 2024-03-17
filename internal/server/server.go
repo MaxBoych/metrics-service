@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/MaxBoych/MetricsService/config"
+	"github.com/MaxBoych/MetricsService/internal/config"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
 	"github.com/MaxBoych/MetricsService/pkg/logger"
 	"github.com/go-chi/chi/v5"

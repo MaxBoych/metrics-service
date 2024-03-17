@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/MaxBoych/MetricsService/internal/metrics/models"
 	"github.com/MaxBoych/MetricsService/internal/metrics/repository/memory"
@@ -14,7 +13,6 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"log"
 	"math/rand"
-	"net"
 	"net/http"
 	"runtime"
 	"sync"
@@ -82,7 +80,7 @@ func worker(requests <-chan *http.Request, errs chan<- error) {
 	}
 }
 
-func updateMetrics(ms *memory.MemStorage, config Config) {
+func updateMetrics(ms *memory.Storage, config Config) {
 	var stats runtime.MemStats
 
 	for {
@@ -123,7 +121,7 @@ func updateMetrics(ms *memory.MemStorage, config Config) {
 	}
 }
 
-func updateGopsutilMetrics(ms *memory.MemStorage, config Config) {
+func updateGopsutilMetrics(ms *memory.Storage, config Config) {
 	for {
 		time.Sleep(time.Duration(config.pollInterval) * time.Second)
 
@@ -138,12 +136,7 @@ func updateGopsutilMetrics(ms *memory.MemStorage, config Config) {
 	}
 }
 
-func isConnectionRefused(err error) bool {
-	var opError *net.OpError
-	return errors.As(err, &opError)
-}
-
-func sendMetrics(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
+func sendMetrics(ms *memory.Storage, config Config, requests chan<- *http.Request) {
 	for {
 		//logger.Log.Info("New sending...")
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
@@ -174,7 +167,7 @@ func sendMetrics(ms *memory.MemStorage, config Config, requests chan<- *http.Req
 	}
 }
 
-func sendMetricsJSON(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
+func sendMetricsJSON(ms *memory.Storage, config Config, requests chan<- *http.Request) {
 	for {
 		//logger.Log.Info("New sending JSON...")
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)
@@ -235,7 +228,7 @@ func sendMetricsJSON(ms *memory.MemStorage, config Config, requests chan<- *http
 	}
 }
 
-func sendMany(ms *memory.MemStorage, config Config, requests chan<- *http.Request) {
+func sendMany(ms *memory.Storage, config Config, requests chan<- *http.Request) {
 	for {
 		//logger.Log.Info("New sending MANY...")
 		time.Sleep(time.Duration(config.reportInterval) * time.Second)

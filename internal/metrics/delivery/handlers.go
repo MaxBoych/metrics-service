@@ -15,11 +15,11 @@ type MetricsHandler struct {
 	useCase metrics.UseCase
 }
 
-func NotFound(w http.ResponseWriter, r *http.Request) {
+func NotFound(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func BadRequest(w http.ResponseWriter, r *http.Request) {
+func BadRequest(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
@@ -142,7 +142,9 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 	}
 	metricType := metric.MType
 	var resp models.Metrics
-	if metricType == models.GaugeMetricName {
+
+	switch metricType {
+	case models.GaugeMetricName:
 		params := models.Metrics{ID: metricName, Value: metric.Value}
 		_, _ = o.useCase.UpdateGauge(ctx, params)
 		resp = models.Metrics{
@@ -150,7 +152,7 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 			MType: models.GaugeMetricName,
 			Value: metric.Value,
 		}
-	} else if metricType == models.CounterMetricName {
+	case models.CounterMetricName:
 		params := models.Metrics{ID: metricName, Delta: metric.Delta}
 		_, _ = o.useCase.UpdateCounter(ctx, params)
 		resp = models.Metrics{
@@ -158,7 +160,7 @@ func (o *MetricsHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request
 			MType: models.CounterMetricName,
 			Delta: metric.Delta,
 		}
-	} else {
+	default:
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -195,7 +197,9 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 	metricType := metric.MType
 	var resp models.Metrics
-	if metricType == models.GaugeMetricName {
+
+	switch metricType {
+	case models.GaugeMetricName:
 		params := models.Metrics{ID: metricName}
 		gauge, _ := o.useCase.GetGauge(ctx, params)
 		if gauge == nil {
@@ -208,7 +212,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 			MType: models.GaugeMetricName,
 			Value: &v,
 		}
-	} else if metricType == models.CounterMetricName {
+	case models.CounterMetricName:
 		params := models.Metrics{ID: metricName}
 		counter, _ := o.useCase.GetCounter(ctx, params)
 		if counter == nil {
@@ -221,7 +225,7 @@ func (o *MetricsHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 			MType: models.CounterMetricName,
 			Delta: &v,
 		}
-	} else {
+	default:
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

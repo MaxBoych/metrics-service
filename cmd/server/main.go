@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/MaxBoych/MetricsService/config"
+	"github.com/MaxBoych/MetricsService/internal/config"
 	"github.com/MaxBoych/MetricsService/internal/metrics"
 	"github.com/MaxBoych/MetricsService/internal/server"
 	"github.com/MaxBoych/MetricsService/pkg/logger"

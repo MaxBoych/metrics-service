@@ -104,7 +104,7 @@ func (o *MetricsUseCase) UpdateMany(ctx context.Context, ms []models.Metrics) ([
 
 func (o *MetricsUseCase) Ping(ctx context.Context) error {
 	_, err := executeWithRetries(ctx, func(ctx context.Context) (interface{}, error) {
-		db, ok := o.repo.(*postgres.PGStorage)
+		db, ok := o.repo.(*postgres.Storage)
 		if ok {
 			return nil, db.Ping(ctx)
 		}

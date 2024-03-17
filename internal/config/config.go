@@ -61,7 +61,7 @@ func (o *Config) ParseConfig() {
 	}
 }
 
-func (o *Config) ConfigureDB() *postgres.PGStorage {
+func (o *Config) ConfigureDB() *postgres.Storage {
 	logger.Log.Info("INFO config.DatabaseDSN", zap.String("DatabaseDSN", o.DatabaseDSN))
 	db := postgres.NewDBStorage()
 	if o.DatabaseDSN != "" {
@@ -69,9 +69,9 @@ func (o *Config) ConfigureDB() *postgres.PGStorage {
 		if err != nil {
 			logger.Log.Info("ERROR cannot connect to DB", zap.String("err", err.Error()))
 			return nil
-		} else {
-			logger.Log.Info("CONNECT to db is fine")
 		}
+		logger.Log.Info("CONNECT to db is fine")
+
 		err = db.Init(context.Background())
 		if err != nil {
 			logger.Log.Info("ERROR cannot create tables in DB", zap.String("err", err.Error()))
@@ -79,13 +79,13 @@ func (o *Config) ConfigureDB() *postgres.PGStorage {
 		}
 
 		return db
-	} else {
-		logger.Log.Info("database DSN is empty")
-		return nil
 	}
+
+	logger.Log.Info("database DSN is empty")
+	return nil
 }
 
-func (o *Config) ConfigureFS(ms *memory.MemStorage) *file.FileStorage {
+func (o *Config) ConfigureFS(ms *memory.Storage) *file.Storage {
 	fs := file.NewFileStorage(ms)
 	if o.FileStoragePath != "" {
 		fs.SetConfigValues(o.FileStoragePath, o.StoreInterval == 0)
@@ -123,6 +123,6 @@ func (o *Config) ConfigureFS(ms *memory.MemStorage) *file.FileStorage {
 	return fs
 }
 
-func (o *Config) ConfigureMS() *memory.MemStorage {
+func (o *Config) ConfigureMS() *memory.Storage {
 	return memory.NewMemStorage()
 }

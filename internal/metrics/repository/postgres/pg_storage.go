@@ -16,15 +16,15 @@ import (
 	"time"
 )
 
-type PGStorage struct {
+type Storage struct {
 	db *pgxpool.Pool
 }
 
-func NewDBStorage() *PGStorage {
-	return &PGStorage{}
+func NewDBStorage() *Storage {
+	return &Storage{}
 }
 
-func (o *PGStorage) Connect(ctx context.Context, dsn string) error {
+func (o *Storage) Connect(ctx context.Context, dsn string) error {
 	var err error
 	var pool *pgxpool.Pool
 
@@ -62,7 +62,7 @@ func (o *PGStorage) Connect(ctx context.Context, dsn string) error {
 	return nil
 }
 
-func (o *PGStorage) Ping(ctx context.Context) error {
+func (o *Storage) Ping(ctx context.Context) error {
 	var err error
 
 	for _, interval := range values.RetryIntervals {
@@ -88,7 +88,7 @@ func (o *PGStorage) Ping(ctx context.Context) error {
 	return err
 }
 
-func (o *PGStorage) executeTx(ctx context.Context, operation func(ctx context.Context, tx pgx.Tx) error) error {
+func (o *Storage) executeTx(ctx context.Context, operation func(ctx context.Context, tx pgx.Tx) error) error {
 	tx, err := o.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func (o *PGStorage) executeTx(ctx context.Context, operation func(ctx context.Co
 	return nil
 }
 
-func (o *PGStorage) Init(ctx context.Context) error {
+func (o *Storage) Init(ctx context.Context) error {
 	return o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
 		createGaugesTableSQL := fmt.Sprintf(`
@@ -178,13 +178,13 @@ func (o *PGStorage) Init(ctx context.Context) error {
 	})
 }
 
-func (o *PGStorage) Close() {
+func (o *Storage) Close() {
 	if o.db != nil {
 		o.db.Close()
 	}
 }
 
-func (o *PGStorage) UpdateGauge(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
+func (o *Storage) UpdateGauge(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
 	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		return o.updateGauge(ctx, tx, m)
 	})
@@ -192,7 +192,7 @@ func (o *PGStorage) UpdateGauge(ctx context.Context, m models.Metrics) (*models.
 	return &m, err
 }
 
-func (o *PGStorage) updateGauge(ctx context.Context, tx pgx.Tx, m models.Metrics) error {
+func (o *Storage) updateGauge(ctx context.Context, tx pgx.Tx, m models.Metrics) error {
 	query, args, err := squirrel.Insert(GaugesTableName).
 		Columns(insertMetric...).
 		Values(m.ID, *m.Value, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
@@ -225,7 +225,7 @@ func (o *PGStorage) updateGauge(ctx context.Context, tx pgx.Tx, m models.Metrics
 // Это каунтер-счетчик "PollCount". Каждый раз при изменении какой-либо метрики, происходит инкремент.
 // Задача на этот PollCount стояла еще в первом спринте для in-memory хранилища.
 // При переходе в PostreSQL мы по сути дублируем все методы на SQL-лад, поэтому и этот счетчик сюда также перекочевал.
-func (o *PGStorage) count(ctx context.Context, tx pgx.Tx) error {
+func (o *Storage) count(ctx context.Context, tx pgx.Tx) error {
 	incrementValue := 1
 	query, args, err := squirrel.Update(CountersTableName).
 		Set(ValueColumnName, squirrel.Expr(fmt.Sprintf("%s + ?", ValueColumnName), incrementValue)).
@@ -246,7 +246,7 @@ func (o *PGStorage) count(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-func (o *PGStorage) UpdateCounter(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
+func (o *Storage) UpdateCounter(ctx context.Context, m models.Metrics) (*models.Metrics, error) {
 	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		return o.updateCounter(ctx, tx, m)
 	})
@@ -254,7 +254,7 @@ func (o *PGStorage) UpdateCounter(ctx context.Context, m models.Metrics) (*model
 	return &m, err
 }
 
-func (o *PGStorage) updateCounter(ctx context.Context, tx pgx.Tx, m models.Metrics) error {
+func (o *Storage) updateCounter(ctx context.Context, tx pgx.Tx, m models.Metrics) error {
 	query, args, err := squirrel.Insert(CountersTableName).
 		Columns(insertMetric...).
 		Values(m.ID, *m.Delta, squirrel.Expr("NOW()"), squirrel.Expr("NOW()")).
@@ -283,7 +283,7 @@ func (o *PGStorage) updateCounter(ctx context.Context, tx pgx.Tx, m models.Metri
 	return nil
 }
 
-func (o *PGStorage) GetGauge(ctx context.Context, name string) (*models.Gauge, error) {
+func (o *Storage) GetGauge(ctx context.Context, name string) (*models.Gauge, error) {
 	query, args, err := squirrel.Select(selectMetric...).
 		From(GaugesTableName).
 		Where(squirrel.Eq{NameColumnName: name}).
@@ -321,7 +321,7 @@ func (o *PGStorage) GetGauge(ctx context.Context, name string) (*models.Gauge, e
 	return &gauge, nil
 }
 
-func (o *PGStorage) GetCounter(ctx context.Context, name string) (*models.Counter, error) {
+func (o *Storage) GetCounter(ctx context.Context, name string) (*models.Counter, error) {
 	query, args, err := squirrel.Select(selectMetric...).
 		From(CountersTableName).
 		Where(squirrel.Eq{NameColumnName: name}).
@@ -359,7 +359,7 @@ func (o *PGStorage) GetCounter(ctx context.Context, name string) (*models.Counte
 	return &counter, err
 }
 
-func (o *PGStorage) GetAll(ctx context.Context) (*models.Data, error) {
+func (o *Storage) GetAll(ctx context.Context) (*models.Data, error) {
 	data := &models.Data{
 		Gauges:   make(map[string]models.Gauge),
 		Counters: make(map[string]models.Counter),
@@ -423,7 +423,7 @@ func (o *PGStorage) GetAll(ctx context.Context) (*models.Data, error) {
 	return data, err
 }
 
-func (o *PGStorage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
+func (o *Storage) UpdateMany(ctx context.Context, ms []models.Metrics) ([]models.Metrics, error) {
 	err := o.executeTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 
 		var err error
